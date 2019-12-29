@@ -1,0 +1,10 @@
+[package]
+name = "dpcore"
+version = "0.0.1"
+publish = false
+edition = "2018"
+license = "GPLv3"
+
+[dev-dependencies]
+itertools = "0.8.2"
+image = "0.22.3"
