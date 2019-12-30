@@ -1,5 +1,5 @@
 use super::rectiter::RectIterator;
-use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
+use super::tile::{TILE_SIZE, TILE_SIZEI};
 use super::{rasterop, Blendmode, BrushMask, Color, Layer, Rectangle, UserID};
 
 /// A layer editing operation's area of effect.
@@ -36,32 +36,20 @@ pub fn fill_rect(
         None => return AoE::Nothing,
     };
 
-    let tx0 = r.x / TILE_SIZEI;
-    let tx1 = r.right() / TILE_SIZEI;
-    let ty0 = r.y / TILE_SIZEI;
-    let ty1 = r.bottom() / TILE_SIZEI;
-
-    let xtiles = Tile::div_up(layer.width()) as i32;
-
-    let tiles = layer.tilevec_mut();
-
     let pixels = [color.as_pixel(); TILE_SIZE as usize];
 
-    for ty in ty0..=ty1 {
-        for tx in tx0..=tx1 {
-            let tile = &mut tiles[(ty * xtiles + tx) as usize];
-            // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
-            // flag, then this tile can be skipped.
+    for (i, j, tile) in layer.tile_rect_mut(&r) {
+        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
+        // flag, then this tile can be skipped.
 
-            let x0 = tx * TILE_SIZEI;
-            let y0 = ty * TILE_SIZEI;
-            let subrect = Rectangle::new(x0, y0, TILE_SIZEI, TILE_SIZEI)
-                .intersected(&r)
-                .unwrap()
-                .offset(-x0, -y0);
-            for row in tile.rect_iter_mut(user, &subrect) {
-                rasterop::pixel_blend(row, &pixels, 0xff, mode);
-            }
+        let x = i * TILE_SIZEI;
+        let y = j * TILE_SIZEI;
+        let subrect = Rectangle::new(x, y, TILE_SIZEI, TILE_SIZEI)
+            .intersected(&r)
+            .unwrap()
+            .offset(-x, -y);
+        for row in tile.rect_iter_mut(user, &subrect) {
+            rasterop::pixel_blend(row, &pixels, 0xff, mode);
         }
     }
 
@@ -97,39 +85,29 @@ pub fn draw_brush_dab(
         None => return AoE::Nothing,
     };
 
-    let tx0 = rect.x / TILE_SIZEI;
-    let tx1 = rect.right() / TILE_SIZEI;
-    let ty0 = rect.y / TILE_SIZEI;
-    let ty1 = rect.bottom() / TILE_SIZEI;
-
-    let xtiles = Tile::div_up(layer.width()) as i32;
     let colorpix = color.as_pixel();
-    let tiles = layer.tilevec_mut();
 
-    for ty in ty0..=ty1 {
-        for tx in tx0..=tx1 {
-            let tile = &mut tiles[(ty * xtiles + tx) as usize];
-            // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
-            // flag, then this tile can be skipped.
+    for (i, j, tile) in layer.tile_rect_mut(&rect) {
+        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
+        // flag, then this tile can be skipped.
 
-            let x0 = tx * TILE_SIZEI;
-            let y0 = ty * TILE_SIZEI;
-            let subrect = Rectangle::new(x0, y0, TILE_SIZEI, TILE_SIZEI)
-                .intersected(&rect)
-                .unwrap();
-            let tilerect = subrect.offset(-x0, -y0);
-            let maskrect = rect.intersected(&subrect).unwrap().offset(-x, -y);
+        let x0 = i * TILE_SIZEI;
+        let y0 = j * TILE_SIZEI;
+        let subrect = Rectangle::new(x0, y0, TILE_SIZEI, TILE_SIZEI)
+            .intersected(&rect)
+            .unwrap();
+        let tilerect = subrect.offset(-x0, -y0);
+        let maskrect = rect.intersected(&subrect).unwrap().offset(-x, -y);
 
-            for (destrow, maskrow) in
-                tile.rect_iter_mut(user, &tilerect)
-                    .zip(RectIterator::from_rectangle(
-                        &mask.mask,
-                        mask.diameter as usize,
-                        &maskrect,
-                    ))
-            {
-                rasterop::mask_blend(destrow, colorpix, maskrow, mode);
-            }
+        for (destrow, maskrow) in
+            tile.rect_iter_mut(user, &tilerect)
+                .zip(RectIterator::from_rectangle(
+                    &mask.mask,
+                    mask.diameter as usize,
+                    &maskrect,
+                ))
+        {
+            rasterop::mask_blend(destrow, colorpix, maskrow, mode);
         }
     }
 

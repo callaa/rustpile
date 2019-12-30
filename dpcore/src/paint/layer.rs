@@ -4,7 +4,8 @@ use super::blendmode::Blendmode;
 use super::color::Color;
 use super::rect::Rectangle;
 use super::rectiter::RectIterator;
-use super::tile::{Tile, TILE_SIZE};
+use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
+use super::tileiter::MutableTileIterator;
 
 /// A tiled image layer.
 ///
@@ -171,6 +172,29 @@ impl Layer {
     /// functions in `editlayer` module.
     pub fn tilevec_mut(&mut self) -> &mut Vec<Tile> {
         Rc::make_mut(&mut self.tiles)
+    }
+
+    pub fn tile_rect_mut(&mut self, r: &Rectangle) -> MutableTileIterator<Tile> {
+        assert!(
+            r.x >= 0
+                && r.y >= 0
+                && r.right() < self.width as i32
+                && r.bottom() < self.height as i32
+        );
+        let tx0 = (r.x / TILE_SIZEI) as usize;
+        let tx1 = (r.right() / TILE_SIZEI) as usize;
+        let ty0 = (r.y / TILE_SIZEI) as usize;
+        let ty1 = (r.bottom() / TILE_SIZEI) as usize;
+        let stride = Tile::div_up(self.width) as usize;
+
+        MutableTileIterator::new(
+            self.tilevec_mut(),
+            stride,
+            tx0,
+            ty0,
+            tx1 - tx0 + 1,
+            ty1 - ty0 + 1,
+        )
     }
 
     #[cfg(test)]

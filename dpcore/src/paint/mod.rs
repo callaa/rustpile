@@ -2,6 +2,7 @@ pub mod editlayer;
 pub mod rasterop;
 pub mod rectiter;
 pub mod tile;
+pub mod tileiter;
 
 pub type UserID = u8;
 
