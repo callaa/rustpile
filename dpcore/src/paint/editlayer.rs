@@ -9,6 +9,7 @@ use super::{rasterop, Blendmode, BrushMask, Color, Layer, Rectangle, UserID};
 ///
 /// Note that the AoE can be `Nothing` even if some pixels were changed
 /// if the layer is not visible.
+#[derive(Debug)]
 pub enum AoE {
     Rectangle(Rectangle),
     Everything,

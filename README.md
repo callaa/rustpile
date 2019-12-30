@@ -35,7 +35,7 @@ Pie-in-the-sky stuff now within the realm of possibility:
 What is implemented:
 
  * Tiles and layers (basics)
- * Blending modes: normal, erase
+ * All blending modes
  * Layer operations:
    * fill rect
    * draw dab

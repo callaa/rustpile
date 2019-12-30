@@ -3,7 +3,12 @@ use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer};
 mod utils;
 
 fn brush_stroke(layer: &mut Layer, y: i32) {
-    let black = Color{r: 0.0, g: 0.0, b: 0.0, a: 1.0};
+    let black = Color {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
 
     for x in (10..246).step_by(5) {
         let w = 16 + ((x as f32 / 40.0 * 3.14).sin() * 15.0) as i32;
