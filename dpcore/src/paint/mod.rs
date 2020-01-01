@@ -1,3 +1,4 @@
+pub mod annotation;
 pub mod editlayer;
 pub mod rasterop;
 pub mod rectiter;

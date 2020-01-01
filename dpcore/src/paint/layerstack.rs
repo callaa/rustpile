@@ -1,12 +1,13 @@
 use std::rc::Rc;
 
-use super::{Layer, Color};
+use super::annotation::Annotation;
 use super::tile::{Tile, TileData, TILE_SIZE};
+use super::{Color, Layer};
 
 #[derive(Clone)]
 pub struct LayerStack {
     layers: Rc<Vec<Rc<Layer>>>,
-    // annotations: Rc<Vec<Annotation>>,
+    annotations: Rc<Vec<Rc<Annotation>>>,
     pub background: Tile,
     width: u32,
     height: u32,
@@ -16,10 +17,10 @@ impl LayerStack {
     pub fn new(width: u32, height: u32) -> LayerStack {
         LayerStack {
             layers: Rc::new(Vec::<Rc<Layer>>::new()),
-            // annotations: Rc::new(Vec::<Rc<Annotation>>::new()),
+            annotations: Rc::new(Vec::<Rc<Annotation>>::new()),
             background: Tile::Blank,
             width,
-            height
+            height,
         }
     }
 
@@ -81,9 +82,9 @@ impl LayerStack {
 
     /// Flatten layer stack content
     pub fn flatten_tile(&self, i: u32, j: u32) -> TileData {
-        let mut destination  = self.background.clone_data();
+        let mut destination = self.background.clone_data();
 
-        if (i*TILE_SIZE) < self.width && (j*TILE_SIZE) < self.height {
+        if (i * TILE_SIZE) < self.width && (j * TILE_SIZE) < self.height {
             for layer in self.layers.iter() {
                 layer.flatten_tile(&mut destination, i, j);
             }
@@ -143,6 +144,5 @@ mod tests {
 
         let t2 = stack.flatten_tile(1, 0);
         assert_eq!(t2.pixels[0], Color::rgb8(255, 255, 255).as_pixel());
-
     }
 }
