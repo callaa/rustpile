@@ -26,11 +26,27 @@ static TRANSPARENT_DATA: TileData = TileData {
 };
 
 impl TileData {
-    fn new(pixel: u32, user: UserID) -> Rc<TileData> {
-        Rc::new(TileData {
+    pub fn new(pixel: u32, user: UserID) -> TileData {
+        TileData {
             pixels: [pixel; TILE_LENGTH],
             last_touched_by: user,
-        })
+        }
+    }
+
+    pub fn merge_data(&mut self, other: &TileData, opacity: f32, mode: Blendmode) {
+        rasterop::pixel_blend(
+            &mut self.pixels,
+            &other.pixels,
+            (opacity * 255.0) as u8,
+            mode,
+        );
+    }
+
+    pub fn merge_tile(&mut self, other: &Tile, opacity: f32, mode: Blendmode) {
+        match other {
+            Tile::Bitmap(td) => self.merge_data(td, opacity, mode),
+            Tile::Blank => ()
+        }
     }
 }
 
@@ -42,14 +58,14 @@ impl Tile {
         if p == 0 {
             Tile::Blank
         } else {
-            Tile::Bitmap(TileData::new(p, user))
+            Tile::Bitmap(Rc::new(TileData::new(p, user)))
         }
     }
 
     // Construct a new tile filled with the given color.
     // A bitmap tile is constructed even if the color is transparent.
     pub fn new_solid(color: &Color, user: UserID) -> Tile {
-        Tile::Bitmap(TileData::new(color.as_pixel(), user))
+        Tile::Bitmap(Rc::new(TileData::new(color.as_pixel(), user)))
     }
 
     pub fn div_up(x: u32) -> u32 {
@@ -67,6 +83,13 @@ impl Tile {
                 }
             }
             Tile::Blank => Some(Color::TRANSPARENT),
+        }
+    }
+
+    pub fn clone_data(&self) -> TileData {
+        match self {
+            Tile::Bitmap(td) => TileData::clone(td),
+            Tile::Blank => TileData::new(0, 0)
         }
     }
 
@@ -111,19 +134,13 @@ impl Tile {
     pub fn merge(&mut self, other: &Tile, opacity: f32, mode: Blendmode) {
         if let Tile::Bitmap(o) = other {
             match self {
-                Tile::Bitmap(td) => {
-                    let data = Rc::make_mut(td);
-                    rasterop::pixel_blend(
-                        &mut data.pixels,
-                        &o.pixels,
-                        (opacity * 255.0) as u8,
-                        mode,
-                    );
-                }
+                Tile::Bitmap(td) => Rc::make_mut(td).merge_data(o, opacity, mode),
                 Tile::Blank => {
                     // TODO optimization: in certain cases we can just replace this tile with other
-                    *self = Tile::new_solid(&Color::TRANSPARENT, other.last_touched_by());
-                    self.merge(other, opacity, mode);
+                    if mode.can_increase_opacity() {
+                        *self = Tile::new_solid(&Color::TRANSPARENT, other.last_touched_by());
+                        self.merge(other, opacity, mode);
+                    }
                 }
             }
         }

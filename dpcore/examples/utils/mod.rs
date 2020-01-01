@@ -1,5 +1,5 @@
 use dpcore::paint::tile::{Tile, TileData, TILE_SIZE};
-use dpcore::paint::Layer;
+use dpcore::paint::{Layer, LayerStack};
 use image::{ImageBuffer, RgbaImage};
 
 fn copy_tile_to(dest: &mut Vec<u8>, stride: u32, tile: &TileData, tx: u32, ty: u32) {
@@ -17,6 +17,7 @@ fn copy_tile_to(dest: &mut Vec<u8>, stride: u32, tile: &TileData, tx: u32, ty: u
     }
 }
 
+#[allow(dead_code)]
 pub fn save_layer(layer: &Layer, filename: &str) {
     // This is just to make copy_tile_to simpler:
     assert!(layer.width() % TILE_SIZE == 0);
@@ -33,6 +34,27 @@ pub fn save_layer(layer: &Layer, filename: &str) {
     }
 
     let img: RgbaImage = ImageBuffer::from_vec(layer.width(), layer.height(), rgba).unwrap();
+
+    println!("Writing {}", filename);
+    img.save(filename).unwrap();
+}
+
+#[allow(dead_code)]
+pub fn save_layerstack(layerstack: &LayerStack, filename: &str) {
+    // This is just to make copy_tile_to simpler:
+    assert!(layerstack.width() % TILE_SIZE == 0);
+    assert!(layerstack.height() % TILE_SIZE == 0);
+
+    let mut rgba = vec![0u8; (layerstack.width() * layerstack.height() * 4) as usize];
+
+    for ty in 0..(layerstack.height() / TILE_SIZE) {
+        for tx in 0..(layerstack.width() / TILE_SIZE) {
+            let td = layerstack.flatten_tile(tx, ty);
+            copy_tile_to(&mut rgba, layerstack.width(), &td, tx, ty);
+        }
+    }
+
+    let img: RgbaImage = ImageBuffer::from_vec(layerstack.width(), layerstack.height(), rgba).unwrap();
 
     println!("Writing {}", filename);
     img.save(filename).unwrap();

@@ -11,10 +11,12 @@ mod blendmode;
 mod brushmask;
 mod color;
 mod layer;
+mod layerstack;
 mod rect;
 
 pub use blendmode::Blendmode;
 pub use brushmask::BrushMask;
 pub use color::Color;
 pub use layer::Layer;
+pub use layerstack::LayerStack;
 pub use rect::Rectangle;

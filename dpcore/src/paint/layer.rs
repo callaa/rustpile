@@ -4,7 +4,7 @@ use super::blendmode::Blendmode;
 use super::color::Color;
 use super::rect::Rectangle;
 use super::rectiter::RectIterator;
-use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
+use super::tile::{Tile, TileData, TILE_SIZE, TILE_SIZEI};
 use super::tileiter::MutableTileIterator;
 
 /// A tiled image layer.
@@ -195,6 +195,31 @@ impl Layer {
             tx1 - tx0 + 1,
             ty1 - ty0 + 1,
         )
+    }
+
+    pub fn flatten_tile(&self, destination: &mut TileData, i: u32, j: u32) {
+        if !self.is_visible() {
+            return;
+        }
+
+        // TODO censor
+        if self.sublayers.is_empty() {
+            // No sublayers: just composite this one as is
+            destination.merge_tile(self.tile(i, j), self.opacity, self.blendmode);
+
+        } else {
+            // Sublayers present: compositing needed
+            let mut tmp = self.tile(i, j).clone_data();
+            for sublayer in self.sublayers.iter() {
+                if sublayer.is_visible() {
+                    tmp.merge_tile(sublayer.tile(i, j), sublayer.opacity, sublayer.blendmode);
+                }
+            }
+
+            // TODO tint, highlight and onionskin
+
+            destination.merge_data(&mut tmp, self.opacity, self.blendmode);
+        }
     }
 
     #[cfg(test)]
