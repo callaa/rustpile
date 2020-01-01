@@ -1,5 +1,5 @@
-use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer, LayerStack};
 use dpcore::paint::tile::Tile;
+use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer, LayerStack};
 
 mod utils;
 
@@ -27,8 +27,16 @@ fn main() {
 
     layerstack.get_layer_mut(2).unwrap().opacity = 0.5;
 
-    brush_stroke(layerstack.get_layer_mut(1).unwrap(), 60, &Color::rgb8(255, 0, 0));
-    brush_stroke(layerstack.get_layer_mut(2).unwrap(), 80, &Color::rgb8(0, 255, 0));
+    brush_stroke(
+        layerstack.get_layer_mut(1).unwrap(),
+        60,
+        &Color::rgb8(255, 0, 0),
+    );
+    brush_stroke(
+        layerstack.get_layer_mut(2).unwrap(),
+        80,
+        &Color::rgb8(0, 255, 0),
+    );
 
     utils::save_layerstack(&layerstack, "example_layerstack.png");
 }

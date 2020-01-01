@@ -30,20 +30,24 @@ Pie-in-the-sky stuff now within the realm of possibility:
  * Web app using a WebAssembly build of the libraries
  * Android and iOS clients using drawpile-core + drawpile-brushes
 
+## Try it out!
+
+Clone the repo and run `cargo test` to make sure everything works.
+
+Run `cargo run --example` to get a list of available example programs.
+E.g. running `cargo run --example layer_fillrect` will run the example program in `dpcore/examples/layer_fillrect.rs`. It writes out a file named `example_layer_fillrect.png` you can view.
+
 ## Current status
 
 What is implemented:
 
- * Tiles and layers (basics)
- * All blending modes
- * Layer operations:
-   * fill rect
-   * draw dab
- * Dab generation: pixel round, pixel square, GIMP style
+ * Most of the paint engine
 
 What's missing:
 
- * Lots of paintcore features
+ * Parts of the paint engine:
+   * Layer stack observer
+   * Flood fill algorithm (not needed for headless mode)
  * State tracker
  * ACL filtering
  * Protocol (de)serialization

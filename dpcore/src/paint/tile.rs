@@ -45,7 +45,7 @@ impl TileData {
     pub fn merge_tile(&mut self, other: &Tile, opacity: f32, mode: Blendmode) {
         match other {
             Tile::Bitmap(td) => self.merge_data(td, opacity, mode),
-            Tile::Blank => ()
+            Tile::Blank => (),
         }
     }
 }
@@ -89,7 +89,7 @@ impl Tile {
     pub fn clone_data(&self) -> TileData {
         match self {
             Tile::Bitmap(td) => TileData::clone(td),
-            Tile::Blank => TileData::new(0, 0)
+            Tile::Blank => TileData::new(0, 0),
         }
     }
 

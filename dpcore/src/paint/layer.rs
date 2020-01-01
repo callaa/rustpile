@@ -206,7 +206,6 @@ impl Layer {
         if self.sublayers.is_empty() {
             // No sublayers: just composite this one as is
             destination.merge_tile(self.tile(i, j), self.opacity, self.blendmode);
-
         } else {
             // Sublayers present: compositing needed
             let mut tmp = self.tile(i, j).clone_data();
