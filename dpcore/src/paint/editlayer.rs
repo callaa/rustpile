@@ -115,6 +115,55 @@ pub fn draw_brush_dab(
     AoE::Rectangle(rect)
 }
 
+/// Draw an image onto the layer
+///
+/// The given image must be in premultiplied ARGB format.
+/// The image will be drawn onto the given rectangle. The width and height
+/// of the rectangle must match the image dimensions. The rectangle may be
+/// outside the layer boundaries; it will be cropped as needed.
+pub fn draw_image(
+    layer: &mut Layer,
+    user: UserID,
+    image: &[u32],
+    rect: &Rectangle,
+    opacity: f32,
+    blendmode: Blendmode,
+) -> AoE {
+    assert_eq!(image.len(), (rect.w * rect.h) as usize);
+    let destrect = match rect.cropped(layer.width(), layer.height()) {
+        Some(r) => r,
+        None => return AoE::Nothing,
+    };
+
+    let o = (opacity * 255.0) as u8;
+
+    for (i, j, tile) in layer.tile_rect_mut(&destrect) {
+        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
+        // flag, then this tile can be skipped.
+
+        let x0 = i * TILE_SIZEI;
+        let y0 = j * TILE_SIZEI;
+        let subrect = Rectangle::new(x0, y0, TILE_SIZEI, TILE_SIZEI)
+            .intersected(&destrect)
+            .unwrap();
+        let tilerect = subrect.offset(-x0, -y0);
+        let srcrect = rect.intersected(&subrect).unwrap().offset(-rect.x, -rect.y);
+
+        for (destrow, imagerow) in
+            tile.rect_iter_mut(user, &tilerect)
+                .zip(RectIterator::from_rectangle(
+                    &image,
+                    rect.w as usize,
+                    &srcrect,
+                ))
+        {
+            rasterop::pixel_blend(destrow, imagerow, o, blendmode);
+        }
+    }
+
+    AoE::Rectangle(destrect)
+}
+
 /// Merge another layer to this one
 ///
 /// The other layer's opacity and blending mode are used.

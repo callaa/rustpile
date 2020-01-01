@@ -1,5 +1,6 @@
 use dpcore::paint::tile::{Tile, TileData, TILE_SIZE};
 use dpcore::paint::{Layer, LayerStack};
+use image;
 use image::{ImageBuffer, RgbaImage};
 
 fn copy_tile_to(dest: &mut Vec<u8>, stride: u32, tile: &TileData, tx: u32, ty: u32) {
@@ -15,6 +16,30 @@ fn copy_tile_to(dest: &mut Vec<u8>, stride: u32, tile: &TileData, tx: u32, ty: u
         }
         dest_offset += stride * 4;
     }
+}
+
+fn u8_mult(a: u8, b: u8) -> u32 {
+    let c = a as u32 * b as u32 + 0x80u32;
+    ((c >> 8) + c) >> 8
+}
+
+#[allow(dead_code)]
+pub fn load_image(filename: &str) -> (Vec<u32>, i32, i32) {
+    let img = image::open(filename).expect("couldn't load image");
+    let rgba = img.as_rgba8().unwrap();
+
+    let mut argb_data = Vec::<u32>::with_capacity((rgba.width() * rgba.height()) as usize);
+
+    for p in rgba.pixels() {
+        argb_data.push(
+            u8_mult(p.0[3], p.0[0]) << 16
+                | u8_mult(p.0[3], p.0[1]) << 8
+                | u8_mult(p.0[3], p.0[2]) << 0
+                | (p.0[3] as u32) << 24,
+        );
+    }
+
+    (argb_data, rgba.width() as i32, rgba.height() as i32)
 }
 
 #[allow(dead_code)]
@@ -54,7 +79,8 @@ pub fn save_layerstack(layerstack: &LayerStack, filename: &str) {
         }
     }
 
-    let img: RgbaImage = ImageBuffer::from_vec(layerstack.width(), layerstack.height(), rgba).unwrap();
+    let img: RgbaImage =
+        ImageBuffer::from_vec(layerstack.width(), layerstack.height(), rgba).unwrap();
 
     println!("Writing {}", filename);
     img.save(filename).unwrap();
