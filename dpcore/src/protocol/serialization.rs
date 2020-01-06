@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::mem;
 
-const HEADER_LEN: usize = 4;
+pub const HEADER_LEN: usize = 4;
 
 #[derive(Debug)]
 pub struct DeserializationError {
