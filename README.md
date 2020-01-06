@@ -42,6 +42,8 @@ E.g. running `cargo run --example layer_fillrect` will run the example program i
 What is implemented:
 
  * Most of the paint engine
+ * Protocol (de)serialization
+ * Text mode protocol (de)serialization
 
 What's missing:
 
@@ -50,7 +52,6 @@ What's missing:
    * Flood fill algorithm (not needed for headless mode)
  * State tracker
  * ACL filtering
- * Protocol (de)serialization
 
 ## License
 
