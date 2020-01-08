@@ -1,0 +1,9 @@
+[package]
+name = "drawpile-cli"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+dpcore = { path = "../dpcore" }
+clap = "2.33.0"
+

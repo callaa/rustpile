@@ -2,5 +2,6 @@
 
 members = [
 	"dpcore",
+	"drawpile-cli",
 ]
 

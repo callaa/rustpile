@@ -37,6 +37,8 @@ Clone the repo and run `cargo test` to make sure everything works.
 Run `cargo run --example` to get a list of available example programs.
 E.g. running `cargo run --example layer_fillrect` will run the example program in `dpcore/examples/layer_fillrect.rs`. It writes out a file named `example_layer_fillrect.png` you can view.
 
+The `drawpile-cli` tool currently does the same job as `dprectool`. In the future, it will also incorporate the functionality of `drawpile-cmd`.
+
 ## Current status
 
 What is implemented:
