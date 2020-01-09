@@ -5,6 +5,8 @@ use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
 
+pub static VERSION: &'static str = "dp:4.21.2";
+
 #[derive(Debug, PartialEq)]
 pub struct DisconnectMessage {
     pub reason: u8,

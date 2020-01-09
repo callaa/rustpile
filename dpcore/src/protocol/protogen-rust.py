@@ -12,6 +12,8 @@ use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
 
+pub static VERSION: &'static str = "{{ version }}";
+
 {# ### STRUCTS FOR MESSAGES WITH NONTRIVIAL PAYLOADS ### #}
 {% for message in messages %}{% if message.fields|length > 1 %}
 
@@ -415,10 +417,11 @@ def comment(comments):
 
 
 if __name__ == '__main__':
-    messages = load_protocol_definition()
+    protocol = load_protocol_definition()
 
     print(template.render(
-        messages=messages,
+        messages=protocol['messages'],
+        version=protocol['version'],
         field_rust_type=field_rust_type,
         read_field=read_field,
         write_field=write_field,

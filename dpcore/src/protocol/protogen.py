@@ -304,10 +304,15 @@ def load_protocol_definition():
     with open('protocol.yaml') as f:
         desc = load_yaml(f)
 
+    protocol = {}
     messages = {}
     ids = set()
     cmd_names = set()
     for msg in desc:
+        if msg == '_protocol':
+            protocol = desc[msg]
+            continue
+
         m = Message(msg, desc[msg], messages)
         if m.name in messages:
             raise BadDefinition(f"{m.name}: duplicate message name!")
@@ -320,12 +325,16 @@ def load_protocol_definition():
         ids.add(m.id)
         cmd_names.add(m.cmd_name)
 
-    return sorted(messages.values(), key=lambda x: x.id)
+    return {
+        **protocol,
+        'messages': sorted(messages.values(), key=lambda x: x.id)
+    }
 
 
 if __name__ == '__main__':
-    messages = load_protocol_definition()
-    for m in messages:
+    proto = load_protocol_definition()
+    print("Protocol version:", proto['version'])
+    for m in proto['messages']:
         print(repr(m))
         print("")
 

@@ -8,7 +8,7 @@ use std::str;
 
 use crate::protocol::serialization::HEADER_LEN;
 use crate::protocol::textparser::{ParseResult, TextParser};
-use crate::protocol::Message;
+use crate::protocol::{Message, VERSION, ProtocolVersion};
 
 #[derive(Debug)]
 pub enum ReadMessage {
@@ -16,6 +16,21 @@ pub enum ReadMessage {
     Invalid(String),
     IoError(io::Error),
     Eof,
+}
+
+#[derive(PartialEq)]
+pub enum Compatibility {
+    /// Recording is either the same format or a known compatible version
+    Compatible,
+
+    /// Expect minor rendering differences
+    MinorDifferences,
+
+    /// Unknown compatibility. Might work fully, might not work at all.
+    Unknown,
+
+    /// Known to be incompatible
+    Incompatible,
 }
 
 pub trait RecordingReader {
@@ -29,11 +44,45 @@ pub trait RecordingReader {
     /// Get all header metadata
     fn get_metadata_all(&self) -> &HashMap<String, String>;
 
+    /// Check the recordings version number against the current protocol version
+    fn check_compatibility(&self) -> Compatibility {
+        if let Some(vstr) = self.get_metadata("version") {
+            let our = ProtocolVersion::from_string(VERSION).unwrap();
+            if let Some(their) = ProtocolVersion::from_string(vstr) {
+                compare_versions(&our, &their)
+
+            } else {
+                // Probably not compatible if we can't even parse the version string
+                Compatibility::Incompatible
+            }
+        } else {
+            Compatibility::Unknown
+        }
+    }
+
     /// Read a message from the file
     fn read_next(&mut self) -> ReadMessage;
 
     /// Return the index of the last read message (first message is at zero)
     fn current_index(&self) -> usize;
+}
+
+fn compare_versions(our: &ProtocolVersion, their: &ProtocolVersion) -> Compatibility {
+    if our == their {
+        Compatibility::Compatible
+    } else if our.ns != their.ns {
+        // Different namespace, unknown version: incompatible is the safe bet
+        Compatibility::Incompatible
+    } else if our.major < their.major {
+        // Newer major version: likely contains new unsupported commands
+        Compatibility::Unknown
+    } else if their.major < 21 {
+        // Known to be incompatible
+        Compatibility::Incompatible
+    } else {
+        // Different minor version
+        Compatibility::MinorDifferences
+    }
 }
 
 /// Open a recording file, guessing its type based on the contents

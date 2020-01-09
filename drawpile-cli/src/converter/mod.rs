@@ -1,8 +1,10 @@
-use dpcore::protocol::{open_recording, BinaryWriter, ReadMessage, RecordingWriter, TextWriter};
+use dpcore::protocol::{open_recording, Compatibility, BinaryWriter, ReadMessage, RecordingWriter, TextWriter};
 
 use std::fs::File;
 use std::io;
 use std::io::Write;
+use std::error::Error;
+use std::fmt;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Format {
@@ -17,8 +19,30 @@ pub struct ConvertRecOpts<'a> {
     pub output_format: Format,
 }
 
+#[derive(Debug)]
+struct ConversionError {
+    message: &'static str,
+}
+
+impl fmt::Display for ConversionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,"{}",self.message)
+    }
+}
+
+impl Error for ConversionError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
+
 pub fn convert_recording(opts: &ConvertRecOpts) -> Result<(), Box<dyn std::error::Error>> {
     let mut reader = open_recording(opts.input_file)?;
+
+    if reader.check_compatibility() == Compatibility::Incompatible {
+        return Err(Box::new(ConversionError{message: "Unsupported format version"}));
+    }
+
     let mut writer = write_recording(opts.output_file, opts.output_format)?;
 
     writer.write_header(reader.get_metadata_all())?;
@@ -44,24 +68,22 @@ pub fn convert_recording(opts: &ConvertRecOpts) -> Result<(), Box<dyn std::error
 
 fn write_recording(filename: &str, format: Format) -> io::Result<Box<dyn RecordingWriter>> {
     if format == Format::Guess {
-        let guess;
-        if filename.ends_with(".dptxt") || filename == "-" {
-            guess = Format::Text;
+        let guess = if filename.ends_with(".dptxt") || filename == "-" {
+            Format::Text
         } else {
-            guess = Format::Binary;
-        }
+            Format::Binary
+        };
         return write_recording(filename, guess);
     }
 
-    let file: Box<dyn Write>;
-    if filename == "-" {
-        file = Box::new(io::stdout());
+    let file: Box<dyn Write> = if filename == "-" {
+        Box::new(io::stdout())
     } else {
-        file = Box::new(File::create(filename)?);
-    }
+        Box::new(File::create(filename)?)
+    };
 
     Ok(match format {
-        Format::Guess => panic!("shouldn't happen"),
+        Format::Guess => unreachable!(),
         Format::Binary => Box::new(BinaryWriter::open(file)),
         Format::Text => Box::new(TextWriter::open(file)),
     })

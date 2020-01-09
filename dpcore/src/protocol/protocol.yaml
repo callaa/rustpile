@@ -1,3 +1,6 @@
+_protocol:
+    version: dp:4.21.2
+
 # Control messages (transparent)
 Command:
     id: 0
