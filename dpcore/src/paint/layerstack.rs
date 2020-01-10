@@ -92,6 +92,39 @@ impl LayerStack {
 
         destination
     }
+
+    /// Return a resized copy of this stack
+    pub fn resized(&self, top: i32, right: i32, bottom: i32, left: i32) -> Option<LayerStack> {
+        let new_width = left + self.width as i32 + right;
+        let new_height = top + self.height as i32 + bottom;
+        if new_width <= 0 || new_height <= 0 {
+            return None;
+        }
+
+        Some(LayerStack {
+            layers: Rc::new(
+                self.layers
+                    .iter()
+                    .map(|l| Rc::new(l.resized(top, right, bottom, left)))
+                    .collect(),
+            ),
+            annotations: Rc::new(
+                self.annotations
+                    .iter()
+                    .map(|a| {
+                        Rc::new(Annotation {
+                            rect: a.rect.offset(left, top),
+                            text: a.text.clone(),
+                            ..**a
+                        })
+                    })
+                    .collect(),
+            ),
+            background: self.background.clone(),
+            width: new_width as u32,
+            height: new_height as u32,
+        })
+    }
 }
 
 #[cfg(test)]

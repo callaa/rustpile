@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::rc::Rc;
 
 use super::blendmode::Blendmode;
@@ -148,14 +149,44 @@ impl Layer {
         self.tile(ti, tj).pixel_at(tx, ty)
     }
 
+    /// Check if every tile of this layer is the same
+    pub fn same_tile(&self) -> Option<Tile> {
+        if self.tiles.is_empty() {
+            return None;
+        }
+        let first = &self.tiles[0];
+        if self.tiles[1..].iter().any(|t| t != first) {
+            return None;
+        }
+
+        Some(first.clone())
+    }
+
+    /// Check if this entire layer is filled with a solid color
+    pub fn solid_color(&self) -> Option<Color> {
+        if self.tiles.is_empty() {
+            return Some(Color::TRANSPARENT);
+        }
+        let c = self.tiles[0].solid_color();
+        if c.is_none() || self.tiles[1..].iter().any(|t| t.solid_color() != c) {
+            None
+        } else {
+            c
+        }
+    }
+
     /// Return the tile at the given index
     pub fn tile(&self, i: u32, j: u32) -> &Tile {
+        debug_assert!(i * TILE_SIZE < self.width);
+        debug_assert!(j * TILE_SIZE < self.height);
         let xtiles = Tile::div_up(self.width);
         &self.tiles[(j * xtiles + i) as usize]
     }
 
     /// Return a mutable reference to a tile at the given index
     pub fn tile_mut(&mut self, i: u32, j: u32) -> &mut Tile {
+        debug_assert!(i * TILE_SIZE < self.width);
+        debug_assert!(j * TILE_SIZE < self.height);
         let xtiles = Tile::div_up(self.width);
         let v = Rc::make_mut(&mut self.tiles);
         &mut v[(j * xtiles + i) as usize]
@@ -221,6 +252,73 @@ impl Layer {
         }
     }
 
+    /// Return a new layer with the size adjusted by the given values
+    ///
+    /// The new layer will contain the same content as this one, but offset and possibly cropped.
+    /// If the layer is filled with a solid color, the resized layer will also be fully filled
+    /// with that color. Otherwise, the expanded areas will be filled with transparency.
+    pub fn resized(&self, top: i32, right: i32, bottom: i32, left: i32) -> Layer {
+        let new_width = u32::try_from(left + self.width as i32 + right).unwrap();
+        let new_height = u32::try_from(top + self.height as i32 + bottom).unwrap();
+
+        let new_tiles = if let Some(c) = self.solid_color() {
+            // The fastest case: this layer is filled with solid color
+            Rc::new(vec![
+                Tile::new(&c, 0);
+                (Tile::div_up(new_width) * Tile::div_up(new_height))
+                    as usize
+            ])
+        } else if (left % TILE_SIZEI) == 0 && (top % TILE_SIZEI) == 0 {
+            // Tile aligned resize. Existing tiles can be reused.
+            self.resized_fast(left, top, new_width as u32, new_height as u32)
+        } else {
+            // Uh oh, top/left change not evenly divisible by tile size
+            // means we have to rebuild all the tiles
+            self.resized_slow()
+        };
+
+        Layer {
+            width: new_width,
+            height: new_height,
+            tiles: new_tiles,
+            sublayers: self
+                .sublayers
+                .iter()
+                .map(|sl| Rc::new(sl.resized(top, right, bottom, left)))
+                .collect(),
+            ..*self
+        }
+    }
+
+    fn resized_slow(&self) -> Rc<Vec<Tile>> {
+        todo!();
+    }
+
+    fn resized_fast(&self, offx: i32, offy: i32, w: u32, h: u32) -> Rc<Vec<Tile>> {
+        debug_assert!(offx % TILE_SIZEI == 0);
+        debug_assert!(offy % TILE_SIZEI == 0);
+        let oldxtiles = Tile::div_up(self.width) as i32;
+        let oldytiles = Tile::div_up(self.height) as i32;
+        let newxtiles = Tile::div_up(w) as i32;
+        let newytiles = Tile::div_up(h) as i32;
+        let mut new_vec = Rc::new(vec![Tile::Blank; (newxtiles * newytiles) as usize]);
+
+        let xt_off = offx / TILE_SIZEI;
+        let yt_off = offy / TILE_SIZEI;
+
+        let tiles = Rc::make_mut(&mut new_vec);
+
+        for y in yt_off.max(0)..newytiles.min(oldytiles + yt_off) {
+            let sy = y - yt_off;
+            for x in xt_off.max(0)..newxtiles.min(oldxtiles + xt_off) {
+                let sx = x - xt_off;
+                tiles[(y * newxtiles + x) as usize] = self.tile(sx as u32, sy as u32).clone();
+            }
+        }
+
+        new_vec
+    }
+
     #[cfg(test)]
     fn refcount(&self) -> usize {
         Rc::strong_count(&self.tiles) + Rc::weak_count(&self.tiles)
@@ -270,5 +368,85 @@ mod tests {
         assert_eq!(layer.pixel_at(2, 1), 13);
         assert_eq!(layer.pixel_at(3, 1), 0);
         assert_eq!(layer.pixel_at(0, 2), 0);
+    }
+
+    #[test]
+    fn test_solid_expand() {
+        let r = Color::rgb8(255, 0, 0);
+        let layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &r);
+        let layer2 = layer.resized(10, 10, 0, 0);
+        for t in layer2.tiles.iter() {
+            assert_eq!(t.solid_color(), Some(r));
+        }
+    }
+
+    #[test]
+    fn test_fast_expand() {
+        let t = Color::TRANSPARENT;
+
+        let mut layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &t);
+        // Change a pixel so the whole layer won't be of uniform color
+        layer
+            .tile_mut(0, 0)
+            .rect_iter_mut(0, &Rectangle::new(1, 1, 1, 1))
+            .next()
+            .unwrap()[0] = 0xff_ffffff;
+
+        let layer2 = layer.resized(TILE_SIZEI, TILE_SIZEI, 2 * TILE_SIZEI, TILE_SIZEI);
+
+        // Should look like:
+        // 000
+        // 0X0
+        // 000
+        // 000
+
+        assert_eq!(layer2.width(), TILE_SIZE * 3);
+        assert_eq!(layer2.height(), TILE_SIZE * 4);
+        assert_eq!(layer2.tile(0, 0).solid_color(), Some(t));
+        assert_eq!(layer2.tile(1, 0).solid_color(), Some(t));
+        assert_eq!(layer2.tile(2, 0).solid_color(), Some(t));
+
+        assert_eq!(layer2.tile(0, 1).solid_color(), Some(t));
+        assert_eq!(layer2.tile(1, 1).solid_color(), None);
+        assert_eq!(layer2.tile(2, 1).solid_color(), Some(t));
+
+        assert_eq!(layer2.tile(0, 2).solid_color(), Some(t));
+        assert_eq!(layer2.tile(1, 2).solid_color(), Some(t));
+        assert_eq!(layer2.tile(2, 2).solid_color(), Some(t));
+
+        assert_eq!(layer2.tile(0, 3).solid_color(), Some(t));
+        assert_eq!(layer2.tile(1, 3).solid_color(), Some(t));
+        assert_eq!(layer2.tile(2, 3).solid_color(), Some(t));
+    }
+
+    #[test]
+    fn test_fast_contract() {
+        let t = Color::TRANSPARENT;
+
+        let mut layer = Layer::new(0, TILE_SIZE * 3, TILE_SIZE * 3, &t);
+        // Change a pixel so the whole layer won't be of uniform color
+        // and so we can distinguish the tiles from the new fully transparent ones.
+        for y in 0..3 {
+            for x in 0..3 {
+                layer
+                    .tile_mut(x, y)
+                    .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
+                    .next()
+                    .unwrap()[0] = 0xff_ffffff;
+            }
+        }
+
+        let layer2 = layer.resized(-TILE_SIZEI, -TILE_SIZEI * 2, TILE_SIZEI, 0);
+
+        // Should look like:
+        // X
+        // X
+        // O
+
+        assert_eq!(layer2.width(), TILE_SIZE);
+        assert_eq!(layer2.height(), TILE_SIZE * 3);
+        assert_eq!(layer2.tile(0, 0).solid_color(), None);
+        assert_eq!(layer2.tile(0, 1).solid_color(), None);
+        assert_eq!(layer2.tile(0, 2).solid_color(), Some(t));
     }
 }
