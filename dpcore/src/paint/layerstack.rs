@@ -93,6 +93,35 @@ impl LayerStack {
         destination
     }
 
+    // Convert to a flat image
+    pub fn to_image(&self) -> (Vec<u32>, u32, u32) {
+        let xtiles = Tile::div_up(self.width) as usize;
+        let ytiles = Tile::div_up(self.height) as usize;
+
+        let tw = TILE_SIZE as usize;
+        let width = self.width as usize;
+        let height = self.height as usize;
+
+        let mut image = vec![0u32; width * height];
+
+        for j in 0..ytiles {
+            let h = tw.min(height - (j * tw));
+            for i in 0..xtiles {
+                let td = self.flatten_tile(i as u32, j as u32);
+                let w = tw.min(width - (i * tw));
+                for y in 0..h {
+                    let dest_offset = (j * tw + y) * width + i * tw;
+                    let src_offset = y * tw;
+
+                    image[dest_offset..dest_offset + w]
+                        .copy_from_slice(&td.pixels[src_offset..src_offset + w]);
+                }
+            }
+        }
+
+        (image, self.width, self.height)
+    }
+
     /// Return a resized copy of this stack
     pub fn resized(&self, top: i32, right: i32, bottom: i32, left: i32) -> Option<LayerStack> {
         let new_width = left + self.width as i32 + right;

@@ -56,12 +56,9 @@ mod tests {
 
     #[test]
     fn test_ordering() {
-        let a_less_b = [
-            (":0.9.9", ":1.0.0"),
-            (":1.0.0", ":1.0.1"),
-        ];
-        
-        for (a,b) in a_less_b.iter() {
+        let a_less_b = [(":0.9.9", ":1.0.0"), (":1.0.0", ":1.0.1")];
+
+        for (a, b) in a_less_b.iter() {
             assert!(ProtocolVersion::from_string(a) < ProtocolVersion::from_string(b));
         }
     }

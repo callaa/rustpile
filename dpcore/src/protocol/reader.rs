@@ -8,7 +8,7 @@ use std::str;
 
 use crate::protocol::serialization::HEADER_LEN;
 use crate::protocol::textparser::{ParseResult, TextParser};
-use crate::protocol::{Message, VERSION, ProtocolVersion};
+use crate::protocol::{Message, ProtocolVersion, VERSION};
 
 #[derive(Debug)]
 pub enum ReadMessage {
@@ -50,7 +50,6 @@ pub trait RecordingReader {
             let our = ProtocolVersion::from_string(VERSION).unwrap();
             if let Some(their) = ProtocolVersion::from_string(vstr) {
                 compare_versions(&our, &their)
-
             } else {
                 // Probably not compatible if we can't even parse the version string
                 Compatibility::Incompatible
@@ -315,7 +314,7 @@ impl<R: BufRead> RecordingReader for TextReader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{Body, JoinMessage};
+    use crate::protocol::message::{Body, JoinMessage};
     use std::io::Cursor;
 
     fn test_reader(reader: &mut dyn RecordingReader) {

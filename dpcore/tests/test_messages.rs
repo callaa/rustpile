@@ -1,4 +1,5 @@
-use dpcore::protocol::*;
+use dpcore::protocol::message::*;
+use dpcore::protocol::TextParser;
 
 #[test]
 fn test_message_serialization() {

@@ -1,10 +1,12 @@
-use dpcore::protocol::{open_recording, Compatibility, BinaryWriter, ReadMessage, RecordingWriter, TextWriter};
+use dpcore::protocol::{
+    open_recording, BinaryWriter, Compatibility, ReadMessage, RecordingWriter, TextWriter,
+};
 
+use std::error::Error;
+use std::fmt;
 use std::fs::File;
 use std::io;
 use std::io::Write;
-use std::error::Error;
-use std::fmt;
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum Format {
@@ -26,7 +28,7 @@ struct ConversionError {
 
 impl fmt::Display for ConversionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{}",self.message)
+        write!(f, "{}", self.message)
     }
 }
 
@@ -40,7 +42,9 @@ pub fn convert_recording(opts: &ConvertRecOpts) -> Result<(), Box<dyn std::error
     let mut reader = open_recording(opts.input_file)?;
 
     if reader.check_compatibility() == Compatibility::Incompatible {
-        return Err(Box::new(ConversionError{message: "Unsupported format version"}));
+        return Err(Box::new(ConversionError {
+            message: "Unsupported format version",
+        }));
     }
 
     let mut writer = write_recording(opts.output_file, opts.output_format)?;

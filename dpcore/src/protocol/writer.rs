@@ -76,7 +76,7 @@ impl<W: Write> RecordingWriter for TextWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{Body, JoinMessage};
+    use crate::protocol::message::{Body, JoinMessage};
     use std::io::Cursor;
     use std::str;
 

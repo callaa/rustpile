@@ -23,6 +23,23 @@ impl Color {
         };
     }
 
+    pub fn from_argb32(c: u32) -> Color {
+        Color {
+            r: ((c & 0x00_ff0000) >> 16) as f32 / 255.0,
+            g: ((c & 0x00_00ff00) >> 8) as f32 / 255.0,
+            b: (c & 0x00_0000ff) as f32 / 255.0,
+            a: ((c & 0xff_000000) >> 24) as f32 / 255.0,
+        }
+    }
+
+    // Get a non-premultiplied pixel value from this color
+    pub fn as_argb32(&self) -> u32 {
+        ((self.r * 255.0) as u32) << 16
+            | ((self.g * 255.0) as u32) << 8
+            | ((self.b * 255.0) as u32)
+            | ((self.a * 255.0) as u32) << 24
+    }
+
     // Get a color from a premultiplied pixel value
     pub fn from_pixel(p: u32) -> Color {
         let a = p >> 24;

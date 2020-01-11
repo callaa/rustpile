@@ -1,6 +1,6 @@
 use super::rectiter::RectIterator;
-use super::tile::{TILE_SIZE, TILE_SIZEI};
-use super::{rasterop, Blendmode, BrushMask, Color, Layer, Rectangle, UserID};
+use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
+use super::{rasterop, Blendmode, BrushMask, Color, Layer, LayerID, Rectangle, UserID};
 
 /// A layer editing operation's area of effect.
 ///
@@ -164,6 +164,47 @@ pub fn draw_image(
     AoE::Rectangle(destrect)
 }
 
+/// Replace a tile or a stretch of tiles
+/// This is typically used to
+pub fn put_tile(
+    layer: &mut Layer,
+    sublayer: LayerID,
+    col: u32,
+    row: u32,
+    repeat: u32,
+    tile: &Tile,
+) -> AoE {
+    if sublayer != 0 {
+        return put_tile(
+            layer.get_or_create_sublayer(sublayer),
+            0,
+            col,
+            row,
+            repeat,
+            &tile,
+        );
+    }
+
+    let xtiles = Tile::div_up(layer.width());
+    let tilevec = layer.tilevec_mut();
+    if tilevec.is_empty() {
+        return AoE::Nothing;
+    }
+
+    let start = (row * xtiles + col) as usize;
+
+    if start >= tilevec.len() {
+        return AoE::Nothing;
+    }
+
+    let end = (tilevec.len() - 1).min(start + repeat as usize);
+    for t in &mut tilevec[start..=end] {
+        *t = tile.clone();
+    }
+
+    AoE::Everything // TODO
+}
+
 /// Merge another layer to this one
 ///
 /// The other layer's opacity and blending mode are used.
@@ -190,7 +231,7 @@ pub fn merge(target_layer: &mut Layer, source_layer: &Layer) -> AoE {
 }
 
 /// Merge a sublayer
-pub fn merge_sublayer(layer: &mut Layer, sublayer_id: i32) -> AoE {
+pub fn merge_sublayer(layer: &mut Layer, sublayer_id: LayerID) -> AoE {
     if let Some(sublayer) = layer.take_sublayer(sublayer_id) {
         merge(layer, &sublayer)
     } else {
@@ -199,13 +240,36 @@ pub fn merge_sublayer(layer: &mut Layer, sublayer_id: i32) -> AoE {
 }
 
 /// Remove a sublayer without merging it
-pub fn remove_sublayer(layer: &mut Layer, sublayer_id: i32) -> AoE {
+pub fn remove_sublayer(layer: &mut Layer, sublayer_id: LayerID) -> AoE {
     if let Some(_sublayer) = layer.take_sublayer(sublayer_id) {
         // TODO visible tiles only
         AoE::Everything
     } else {
         AoE::Nothing
     }
+}
+
+pub fn change_attributes(
+    layer: &mut Layer,
+    sublayer: LayerID,
+    opacity: f32,
+    blend: Blendmode,
+    censored: bool,
+    fixed: bool,
+) -> AoE {
+    if sublayer != 0 {
+        let sl = layer.get_or_create_sublayer(sublayer);
+        sl.blendmode = blend;
+        sl.opacity = opacity;
+    } else {
+        layer.blendmode = blend;
+        layer.opacity = opacity;
+        layer.censored = censored;
+        layer.fixed = fixed;
+    }
+
+    // TODO
+    AoE::Everything
 }
 
 #[cfg(test)]

@@ -7,6 +7,7 @@ use super::rect::Rectangle;
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TileData, TILE_SIZE, TILE_SIZEI};
 use super::tileiter::MutableTileIterator;
+use super::LayerID;
 
 /// A tiled image layer.
 ///
@@ -16,7 +17,7 @@ use super::tileiter::MutableTileIterator;
 ///
 #[derive(Clone)]
 pub struct Layer {
-    pub id: i32,
+    pub id: LayerID,
     pub opacity: f32,
     pub hidden: bool,
     pub censored: bool,
@@ -91,7 +92,7 @@ impl Layer {
     ///
     /// By convention, ID 0 is not used. Sublayers with positive IDs are used for indirect
     /// drawing (matching user IDs) and sublayers with negative IDs are for local previews.
-    pub fn get_or_create_sublayer(&mut self, id: i32) -> &mut Layer {
+    pub fn get_or_create_sublayer(&mut self, id: LayerID) -> &mut Layer {
         assert!(id != 0, "Sublayer ID 0 is not allowed");
 
         if let Some(i) = self.sublayers.iter().position(|sl| sl.id == id) {
@@ -111,7 +112,7 @@ impl Layer {
     ///
     /// Note: you should not typically need to call this directly.
     /// Instead, use `merge_sublayer` or `remove_sublayer` from `editlayer` module
-    pub fn take_sublayer(&mut self, id: i32) -> Option<Rc<Layer>> {
+    pub fn take_sublayer(&mut self, id: LayerID) -> Option<Rc<Layer>> {
         if let Some(i) = self.sublayers.iter().position(|sl| sl.id == id) {
             Some(self.sublayers.remove(i))
         } else {

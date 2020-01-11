@@ -1,4 +1,8 @@
-#[derive(Copy, Clone, Debug)]
+use num_enum::IntoPrimitive;
+use num_enum::TryFromPrimitive;
+
+#[derive(Copy, Clone, Debug, IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
 pub enum Blendmode {
     Erase = 0,
     Normal,
@@ -17,10 +21,6 @@ pub enum Blendmode {
 }
 
 impl Blendmode {
-    pub fn id(self) -> u8 {
-        (((self as isize) & 0xff00) >> 8) as u8
-    }
-
     pub fn can_decrease_opacity(self) -> bool {
         match self {
             Blendmode::Erase | Blendmode::ColorErase | Blendmode::Replace => true,
@@ -34,7 +34,4 @@ impl Blendmode {
             _ => false,
         }
     }
-
-    //pub fn from_id(id: u8) -> Option<Blendmode> {
-    //}
 }

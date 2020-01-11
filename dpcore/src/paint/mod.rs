@@ -6,6 +6,7 @@ pub mod tile;
 pub mod tileiter;
 
 pub type UserID = u8;
+pub type LayerID = i32;
 
 // Re-export types most commonly used from the outside
 mod blendmode;
