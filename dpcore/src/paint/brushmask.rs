@@ -8,6 +8,26 @@ pub struct BrushMask {
     pub mask: Vec<u8>,
 }
 
+pub struct ClassicBrushCache {
+    lut: Vec<Vec<f32>>,
+}
+
+impl ClassicBrushCache {
+    pub fn new() -> ClassicBrushCache {
+        ClassicBrushCache {
+            lut: vec![Vec::new(); 101],
+        }
+    }
+
+    fn get_cached_lut(&mut self, hardness: f32) -> &[f32] {
+        let h = (hardness * 100.0) as usize;
+        if self.lut[h].len() == 0 {
+            self.lut[h] = make_gimp_style_brush_lut(hardness);
+        }
+        return &self.lut[h];
+    }
+}
+
 fn square(v: f32) -> f32 {
     v * v
 }
@@ -52,11 +72,12 @@ impl BrushMask {
         diameter: f32,
         hardness: f32,
         opacity: f32,
+        cache: &mut ClassicBrushCache,
     ) -> (i32, i32, BrushMask) {
         let (offset, mask) = if diameter < 16.0 {
-            BrushMask::new_gimp_style_highres(diameter / 2.0, hardness, opacity)
+            BrushMask::new_gimp_style_highres(diameter / 2.0, hardness, opacity, cache)
         } else {
-            BrushMask::new_gimp_style_lowres(diameter / 2.0, hardness, opacity)
+            BrushMask::new_gimp_style_lowres(diameter / 2.0, hardness, opacity, cache)
         };
 
         let fx = x.floor();
@@ -87,7 +108,12 @@ impl BrushMask {
     }
 
     // Make a high-res Gimp style mask useful for small brushes. Return values includes x/y offset to get the top-left corner
-    fn new_gimp_style_highres(radius: f32, hardness: f32, opacity: f32) -> (f32, BrushMask) {
+    fn new_gimp_style_highres(
+        radius: f32,
+        hardness: f32,
+        opacity: f32,
+        cache: &mut ClassicBrushCache,
+    ) -> (f32, BrushMask) {
         let op = opacity * (255.0 / 4.0); // opacity per subsample
         let mut diameter = (radius * 2.0).ceil() as u32 + 2;
         let mut offset = (radius.ceil() - radius) / -2.0;
@@ -100,7 +126,7 @@ impl BrushMask {
         }
 
         let r2 = radius * 2.0;
-        let lut = make_gimp_style_brush_lut(hardness);
+        let lut = cache.get_cached_lut(hardness);
         let lut_scale = square((LUT_RADIUS - 1.0) / r2);
 
         let mut mask = vec![0u8; (diameter * diameter) as usize];
@@ -149,11 +175,15 @@ impl BrushMask {
     }
 
     // Make a low-res Gimp style mask useful for large brushes. Return values includes x/y offset to get the top-left corner
-    fn new_gimp_style_lowres(radius: f32, hardness: f32, opacity: f32) -> (f32, BrushMask) {
+    fn new_gimp_style_lowres(
+        radius: f32,
+        hardness: f32,
+        opacity: f32,
+        cache: &mut ClassicBrushCache,
+    ) -> (f32, BrushMask) {
         let op = opacity * 255.0;
 
-        // TODO cache this
-        let lut = make_gimp_style_brush_lut(hardness);
+        let lut = cache.get_cached_lut(hardness);
         let lut_scale = square((LUT_RADIUS - 1.0) / radius);
         let offset;
         let mut fudge = 1.0;

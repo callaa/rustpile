@@ -1,9 +1,16 @@
-use crate::paint::{editlayer, Blendmode, BrushMask, Color, Layer, LayerID, UserID};
+use crate::paint::{
+    editlayer, Blendmode, BrushMask, ClassicBrushCache, Color, Layer, LayerID, UserID,
+};
 use crate::protocol::message::DrawDabsClassicMessage;
 
 use std::convert::TryFrom;
 
-pub fn drawdabs_classic(layer: &mut Layer, user: UserID, dabs: &DrawDabsClassicMessage) {
+pub fn drawdabs_classic(
+    layer: &mut Layer,
+    user: UserID,
+    dabs: &DrawDabsClassicMessage,
+    cache: &mut ClassicBrushCache,
+) {
     let mode = Blendmode::try_from(dabs.mode).unwrap_or(Blendmode::Normal);
     let mut color = Color::from_argb32(dabs.color);
 
@@ -13,10 +20,10 @@ pub fn drawdabs_classic(layer: &mut Layer, user: UserID, dabs: &DrawDabsClassicM
         sublayer.opacity = color.a;
         sublayer.blendmode = mode;
         color.a = 1.0;
-        drawdabs_classic_draw(sublayer, user, color, Blendmode::Normal, &dabs);
+        drawdabs_classic_draw(sublayer, user, color, Blendmode::Normal, &dabs, cache);
     } else {
         color.a = 1.0; // needed because as_pixel returns premultiplied pixel values
-        drawdabs_classic_draw(layer, user, color, mode, &dabs);
+        drawdabs_classic_draw(layer, user, color, mode, &dabs, cache);
     }
     // TODO return AoE
 }
@@ -27,6 +34,7 @@ fn drawdabs_classic_draw(
     color: Color,
     mode: Blendmode,
     dabs: &DrawDabsClassicMessage,
+    cache: &mut ClassicBrushCache,
 ) {
     let mut last_x = dabs.x;
     let mut last_y = dabs.y;
@@ -40,6 +48,7 @@ fn drawdabs_classic_draw(
             dab.size as f32 / 256.0,
             dab.hardness as f32 / 255.0,
             dab.opacity as f32 / 255.0,
+            cache,
         );
         editlayer::draw_brush_dab(layer, user, mx, my, &mask, &color, mode);
 

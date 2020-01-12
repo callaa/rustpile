@@ -17,7 +17,7 @@ mod layerstack;
 mod rect;
 
 pub use blendmode::Blendmode;
-pub use brushmask::BrushMask;
+pub use brushmask::{BrushMask, ClassicBrushCache};
 pub use color::Color;
 pub use layer::Layer;
 pub use layerstack::LayerStack;

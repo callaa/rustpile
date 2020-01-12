@@ -1,6 +1,6 @@
 use super::brushes;
 use crate::paint::tile::Tile;
-use crate::paint::{editlayer, Blendmode, Color, LayerID, LayerStack, UserID};
+use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, LayerStack, UserID};
 use crate::protocol::message::*;
 
 use std::convert::{TryFrom, TryInto};
@@ -8,12 +8,14 @@ use tracing::warn;
 
 pub struct CanvasState {
     layerstack: LayerStack,
+    brushcache: ClassicBrushCache,
 }
 
 impl CanvasState {
     pub fn new() -> CanvasState {
         CanvasState {
             layerstack: LayerStack::new(0, 0),
+            brushcache: ClassicBrushCache::new(),
         }
     }
 
@@ -127,7 +129,7 @@ impl CanvasState {
 
     fn handle_drawdabs_classic(&mut self, user: UserID, msg: &DrawDabsClassicMessage) {
         if let Some(layer) = self.layerstack.get_layer_mut(msg.layer as LayerID) {
-            brushes::drawdabs_classic(layer, user, &msg);
+            brushes::drawdabs_classic(layer, user, &msg, &mut self.brushcache);
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
         }
