@@ -14,3 +14,9 @@ num_enum = "0.4.2"
 [dev-dependencies]
 itertools = "0.8.2"
 image = "0.22.3"
+criterion = "0.3"
+
+[[bench]]
+name = "rasterops"
+harness = false
+
