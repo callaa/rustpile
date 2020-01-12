@@ -27,8 +27,12 @@ impl CanvasState {
         use Body::*;
         match &msg.body {
             DrawDabsClassic(m) => self.handle_drawdabs_classic(msg.user_id, m),
+            DrawDabsPixel(m) => self.handle_drawdabs_pixel(msg.user_id, m, false),
+            DrawDabsPixelSquare(m) => self.handle_drawdabs_pixel(msg.user_id, m, true),
+
             UndoPoint => self.handle_undopoint(msg.user_id),
             PenUp => self.handle_penup(msg.user_id),
+            Undo(m) => self.handle_undo(m),
 
             CanvasResize(m) => self.handle_canvas_resize(m),
             LayerCreate(m) => self.handle_layer_create(m),
@@ -54,6 +58,10 @@ impl CanvasState {
     }
 
     fn handle_undopoint(&mut self, user_id: UserID) {
+        // TODO
+    }
+
+    fn handle_undo(&mut self, msg: &UndoMessage) {
         // TODO
     }
 
@@ -132,6 +140,14 @@ impl CanvasState {
             brushes::drawdabs_classic(layer, user, &msg, &mut self.brushcache);
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
+        }
+    }
+
+    fn handle_drawdabs_pixel(&mut self, user: UserID, msg: &DrawDabsPixelMessage, square: bool) {
+        if let Some(layer) = self.layerstack.get_layer_mut(msg.layer as LayerID) {
+            brushes::drawdabs_pixel(layer, user, &msg, square);
+        } else {
+            warn!("DrawDabsPixel: Layer {:04x} not found!", msg.layer);
         }
     }
 }
