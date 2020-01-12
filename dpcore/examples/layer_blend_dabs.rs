@@ -14,7 +14,7 @@ fn main() {
         editlayer::fill_rect(
             &mut layer,
             0,
-            &Color::from_pixel(c),
+            &Color::from_argb32(c),
             Blendmode::Normal,
             &Rectangle::new(i as i32 * 40, 0, 40, 256),
         );

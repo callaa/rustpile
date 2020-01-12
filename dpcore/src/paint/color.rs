@@ -1,3 +1,12 @@
+pub type Pixel = [u8;4];
+
+pub const ALPHA_CHANNEL: usize = 0;
+pub const RED_CHANNEL: usize = 1;
+pub const GREEN_CHANNEL: usize = 2;
+pub const BLUE_CHANNEL: usize = 3;
+pub const RGB_CHANNELS: std::ops::RangeInclusive<usize> = 1..=3;
+pub const ZERO_PIXEL: Pixel = [0, 0, 0, 0];
+
 #[derive(Copy, Clone, Debug)]
 pub struct Color {
     pub r: f32,
@@ -41,27 +50,29 @@ impl Color {
     }
 
     // Get a color from a premultiplied pixel value
-    pub fn from_pixel(p: u32) -> Color {
-        let a = p >> 24;
-        if a == 0 {
+    pub fn from_pixel(p: Pixel) -> Color {
+        if p[ALPHA_CHANNEL] == 0 {
             return Color::TRANSPARENT;
         }
-        let af = 1.0 / a as f32;
+        let af = 1.0 / p[ALPHA_CHANNEL] as f32;
 
         Color {
-            r: ((p & 0x00ff0000) >> 16) as f32 * af,
-            g: ((p & 0x0000ff00) >> 8) as f32 * af,
-            b: (p & 0x000000ff) as f32 * af,
-            a: a as f32 / 255.0,
+            r: p[RED_CHANNEL] as f32 * af,
+            g: p[GREEN_CHANNEL] as f32 * af,
+            b: p[BLUE_CHANNEL] as f32 * af,
+            a: p[ALPHA_CHANNEL] as f32 / 255.0,
         }
     }
 
     // Get a premultiplied pixel value from this color
-    pub fn as_pixel(&self) -> u32 {
-        ((self.r * self.a * 255.0) as u32) << 16
-            | ((self.g * self.a * 255.0) as u32) << 8
-            | ((self.b * self.a * 255.0) as u32)
-            | ((self.a * 255.0) as u32) << 24
+    pub fn as_pixel(&self) -> Pixel {
+        let af = self.a * 255.0;
+        [
+            (self.a * 255.0) as u8,
+            (self.r * af) as u8,
+            (self.g * af) as u8,
+            (self.b * af) as u8,
+        ]
     }
 }
 

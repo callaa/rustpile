@@ -1,6 +1,7 @@
-use super::{Blendmode, Color};
+use super::Blendmode;
+use super::color::*;
 
-pub fn pixel_blend(base: &mut [u32], over: &[u32], opacity: u8, mode: Blendmode) {
+pub fn pixel_blend(base: &mut [Pixel], over: &[Pixel], opacity: u8, mode: Blendmode) {
     match mode {
         Blendmode::Normal => alpha_pixel_blend(base, over, opacity),
         Blendmode::Erase => alpha_pixel_erase(base, over, opacity),
@@ -19,7 +20,7 @@ pub fn pixel_blend(base: &mut [u32], over: &[u32], opacity: u8, mode: Blendmode)
     }
 }
 
-pub fn mask_blend(base: &mut [u32], color: u32, mask: &[u8], mode: Blendmode) {
+pub fn mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8], mode: Blendmode) {
     match mode {
         Blendmode::Normal => alpha_mask_blend(base, color, mask),
         Blendmode::Erase => alpha_mask_erase(base, mask),
@@ -38,25 +39,28 @@ pub fn mask_blend(base: &mut [u32], color: u32, mask: &[u8], mode: Blendmode) {
     }
 }
 
-fn split_channels(c: u32) -> (u32, u32, u32, u32) {
-    (
-        c >> 24,
-        (c & 0x00ff0000) >> 16,
-        (c & 0x0000ff00) >> 8,
-        c & 0x000000ff,
-    )
+trait ScratchArray {
+    fn into_work(self) -> [u32;4];
+    fn from_work(p: [u32;4]) -> Self;
 }
 
-fn get_alpha(c: u32) -> u32 {
-    c >> 24
-}
-
-fn combine_channels(a: u32, r: u32, g: u32, b: u32) -> u32 {
-    debug_assert!(a <= 0xff);
-    debug_assert!(r <= 0xff);
-    debug_assert!(g <= 0xff);
-    debug_assert!(b <= 0xff);
-    (a << 24) | (r << 16) | (g << 8) | b
+impl ScratchArray for Pixel {
+    fn from_work(p: [u32;4]) -> Self {
+        [
+            p[0] as u8,
+            p[1] as u8,
+            p[2] as u8,
+            p[3] as u8,
+        ]
+    }
+    fn into_work(self) -> [u32;4] {
+        [
+            self[0] as u32,
+            self[1] as u32,
+            self[2] as u32,
+            self[3] as u32,
+        ]
+    }
 }
 
 fn u8_mult(a: u32, b: u32) -> u32 {
@@ -65,58 +69,64 @@ fn u8_mult(a: u32, b: u32) -> u32 {
 }
 
 /// Perform a premultiplied alpha blend operation on a slice of 32 bit ARGB pixels
-fn alpha_pixel_blend(base: &mut [u32], over: &[u32], opacity: u8) {
+fn alpha_pixel_blend(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
-        let (sa, sr, sg, sb) = split_channels(*sp);
-        let a_s = 255 - u8_mult(sa, o);
+        let bp = dp.into_work();
+        let src = sp.into_work();
+        let a_s = 255 - u8_mult(src[ALPHA_CHANNEL], o);
 
-        da = u8_mult(sa, o) + u8_mult(da, a_s);
-        dr = u8_mult(sr, o) + u8_mult(dr, a_s);
-        dg = u8_mult(sg, o) + u8_mult(dg, a_s);
-        db = u8_mult(sb, o) + u8_mult(db, a_s);
+        let result = [
+            u8_mult(src[0], o) + u8_mult(bp[0], a_s),
+            u8_mult(src[1], o) + u8_mult(bp[1], a_s),
+            u8_mult(src[2], o) + u8_mult(bp[2], a_s),
+            u8_mult(src[3], o) + u8_mult(bp[3], a_s),
+        ];
 
-        *dp = combine_channels(da, dr, dg, db);
+        *dp = Pixel::from_work(result);
     }
 }
 
 /// Perform a premultiplied alpha blend operation on a slice of 32 bit ARGB pixels
-fn alpha_pixel_under(base: &mut [u32], over: &[u32], opacity: u8) {
+fn alpha_pixel_under(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
-        let (sa, sr, sg, sb) = split_channels(*sp);
-        let a_s = u8_mult(255 - da, u8_mult(sa, o));
+        let bp = dp.into_work();
+        let src = sp.into_work();
+        let a_s = u8_mult(255 - bp[ALPHA_CHANNEL], u8_mult(src[ALPHA_CHANNEL], o));
 
-        da = u8_mult(sa, a_s) + da;
-        dr = u8_mult(sr, a_s) + dr;
-        dg = u8_mult(sg, a_s) + dg;
-        db = u8_mult(sb, a_s) + db;
+        let result = [
+            u8_mult(src[0], a_s) + bp[0],
+            u8_mult(src[1], a_s) + bp[1],
+            u8_mult(src[2], a_s) + bp[2],
+            u8_mult(src[3], a_s) + bp[3],
+        ];
 
-        *dp = combine_channels(da, dr, dg, db);
+        *dp = Pixel::from_work(result);
     }
 }
 
 /// Perform a premultiplied alpha blend on a slice of 32 bit ARGB pixels
 /// and a color + alpha mask vector.
-fn alpha_mask_under(base: &mut [u32], color: u32, mask: &[u8]) {
+fn alpha_mask_under(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
-    let (_, cr, cg, cb) = split_channels(color);
+    let c = color.into_work();
 
     for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
+        let bp = dp.into_work();
         let m = mask as u32;
-        let a = u8_mult(255 - da, m);
+        let a = u8_mult(255 - bp[0], m);
 
-        da = da + a;
-        dr = u8_mult(cr, a) + dr;
-        dg = u8_mult(cg, a) + dg;
-        db = u8_mult(cb, a) + db;
+        let result = [
+            bp[0] + a,
+            bp[1] + u8_mult(c[1], a),
+            bp[2] + u8_mult(c[2], a),
+            bp[3] + u8_mult(c[3], a),
+        ];
 
-        *dp = combine_channels(da, dr, dg, db);
+        *dp = Pixel::from_work(result);
     }
 }
 
@@ -160,7 +170,7 @@ fn color_erase(dest: &mut Color, color: &Color) {
 }
 
 /// Perform per pixel color erase
-fn pixel_color_erase(base: &mut [u32], over: &[u32], opacity: u8) {
+fn pixel_color_erase(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as f32 / 255.0;
 
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
@@ -173,7 +183,7 @@ fn pixel_color_erase(base: &mut [u32], over: &[u32], opacity: u8) {
     }
 }
 
-fn mask_color_erase(base: &mut [u32], color: u32, mask: &[u8]) {
+fn mask_color_erase(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     let mut c = Color::from_pixel(color);
     for (dp, &mp) in base.into_iter().zip(mask.into_iter()) {
         // TODO optimize this?
@@ -184,72 +194,72 @@ fn mask_color_erase(base: &mut [u32], color: u32, mask: &[u8]) {
     }
 }
 
-fn pixel_replace(base: &mut [u32], over: &[u32], opacity: u8) {
+fn pixel_replace(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
-        let (sa, sr, sg, sb) = split_channels(*sp);
-
-        let da = u8_mult(sa, o);
-        let dr = u8_mult(sr, o);
-        let dg = u8_mult(sg, o);
-        let db = u8_mult(sb, o);
-
-        *dp = combine_channels(da, dr, dg, db);
+        let src = sp.into_work();
+        *dp = [
+            u8_mult(src[0], o) as u8,
+            u8_mult(src[1], o) as u8,
+            u8_mult(src[2], o) as u8,
+            u8_mult(src[3], o) as u8,
+        ];
     }
 }
 
 /// Perform a premultiplied alpha blend on a slice of 32 bit ARGB pixels
 /// and a color + alpha mask vector.
-fn alpha_mask_blend(base: &mut [u32], color: u32, mask: &[u8]) {
+fn alpha_mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
-    let (_, cr, cg, cb) = split_channels(color);
+    let c = color.into_work();
 
     for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
+        let bp = dp.into_work();
         let m = mask as u32;
         let a = 255 - m;
 
-        da = m + u8_mult(da, a);
-        dr = u8_mult(cr, m) + u8_mult(dr, a);
-        dg = u8_mult(cg, m) + u8_mult(dg, a);
-        db = u8_mult(cb, m) + u8_mult(db, a);
+        let result = [
+            m + u8_mult(bp[0], a),
+            u8_mult(c[1], m) + u8_mult(bp[1], a),
+            u8_mult(c[2], m) + u8_mult(bp[2], a),
+            u8_mult(c[3], m) + u8_mult(bp[3], a),
+        ];
 
-        *dp = combine_channels(da, dr, dg, db);
+        *dp = Pixel::from_work(result);
     }
 }
 
 /// Erase alpha channel
-fn alpha_mask_erase(base: &mut [u32], mask: &[u8]) {
+fn alpha_mask_erase(base: &mut [Pixel], mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
 
     for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
+        let mut dest = dp.into_work();
         let m = mask as u32;
         let a = 255 - m;
 
-        da = u8_mult(da, a);
-        dr = u8_mult(dr, a);
-        dg = u8_mult(dg, a);
-        db = u8_mult(db, a);
-        *dp = combine_channels(da, dr, dg, db);
+        for d in dest.iter_mut() {
+            *d = u8_mult(*d, a);
+        }
+        *dp = Pixel::from_work(dest);
     }
 }
 
 /// Erase using alpha channel of source pixels
-fn alpha_pixel_erase(base: &mut [u32], over: &[u32], opacity: u8) {
+fn alpha_pixel_erase(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
-        let (mut da, mut dr, mut dg, mut db) = split_channels(*dp);
-        let a = 255 - u8_mult(get_alpha(*sp), o);
-
-        da = u8_mult(da, a);
-        dr = u8_mult(dr, a);
-        dg = u8_mult(dg, a);
-        db = u8_mult(db, a);
-
-        *dp = combine_channels(da, dr, dg, db);
+        let a = 255 - u8_mult(sp[ALPHA_CHANNEL] as u32, o);
+        let bp = dp.into_work();
+        let result = [
+            u8_mult(bp[0], a),
+            u8_mult(bp[1], a),
+            u8_mult(bp[2], a),
+            u8_mult(bp[3], a),
+        ];
+        *dp = Pixel::from_work(result);
     }
 }
 
@@ -294,7 +304,7 @@ fn comp_op_recolor(_: f32, b: f32) -> f32 {
 }
 
 /// Generic alpha-preserving compositing operations
-fn pixel_composite(comp_op: fn(f32, f32) -> f32, base: &mut [u32], over: &[u32], opacity: u8) {
+fn pixel_composite(comp_op: fn(f32, f32) -> f32, base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let of = opacity as f32 / 255.0;
     for (dp, sp) in base.into_iter().zip(over.into_iter()) {
         // TODO optimize this. These operations need non-premultiplied color
@@ -311,12 +321,12 @@ fn pixel_composite(comp_op: fn(f32, f32) -> f32, base: &mut [u32], over: &[u32],
     }
 }
 
-fn mask_composite(comp_op: fn(f32, f32) -> f32, base: &mut [u32], color: u32, mask: &[u8]) {
+fn mask_composite(comp_op: fn(f32, f32) -> f32, base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
     let c = Color::from_pixel(color);
     for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
         let mut d = Color::from_pixel(*dp);
-        let m = mask as f32 * 255.0;
+        let m = mask as f32 / 255.0;
 
         d.r = blend(comp_op(d.r, c.r), d.r, m);
         d.g = blend(comp_op(d.g, c.g), d.g, m);
@@ -332,40 +342,40 @@ mod tests {
 
     #[test]
     fn test_alpha_pixel_blend() {
-        let mut base = [0xff_ff0000];
-        let over = [0x80_008000];
+        let mut base = [[255, 255, 0, 0]];
+        let over = [[128, 0, 128, 0]];
 
         alpha_pixel_blend(&mut base, &over, 0xff);
-        assert_eq!(base, [0xff7f8000]);
+        assert_eq!(base, [[255, 127, 128, 0]]);
 
-        let mut base = [0xff_ff0000];
+        let mut base = [[255, 255, 0, 0]];
         alpha_pixel_blend(&mut base, &over, 0x80);
-        assert_eq!(base, [0xffbf4000]);
+        assert_eq!(base, [[255, 191, 64, 0]]);
     }
 
     #[test]
     fn test_alpha_mask_blend() {
-        let mut base = [0xff_ff0000, 0xff_ff0000, 0xff_ff0000];
+        let mut base = [[255, 255, 0, 0], [255, 255, 0, 0], [255, 255, 0, 0]];
         let mask = [0xff, 0x80, 0x40];
 
-        alpha_mask_blend(&mut base, 0x0000ff00, &mask);
-        assert_eq!(base, [0xff_00ff00, 0xff_7f8000, 0xff_bf4000]);
+        alpha_mask_blend(&mut base, [0, 0, 255, 0], &mask);
+        assert_eq!(base, [[255, 0, 255, 0], [255, 127, 128, 0], [255, 191, 64, 0]]);
     }
 
     #[test]
     fn test_alpha_pixel_erase() {
-        let mut base = [0xff_ffffff, 0xff_ffffff, 0xff_ffffff];
-        let over = [0xff_123456, 0x80_123456, 0x00_123456];
+        let mut base = [[255, 255, 255, 255], [255, 255, 255, 255], [255, 255, 255, 255]];
+        let over = [[255, 1, 2, 3], [128, 1, 2, 3], [0, 1, 2, 3]];
 
         alpha_pixel_erase(&mut base, &over, 0xff);
-        assert_eq!(base, [0x00_000000, 0x7f_7f7f7f, 0xff_ffffff]);
+        assert_eq!(base, [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]);
     }
     #[test]
     fn test_alpha_mask_erase() {
-        let mut base = [0xff_ffffff, 0xff_ffffff, 0xff_ffffff];
+        let mut base = [[255, 255, 255, 255], [255, 255, 255, 255], [255, 255,255, 255]];
         let mask = [0xff, 0x80, 0x00];
 
         alpha_mask_erase(&mut base, &mask);
-        assert_eq!(base, [0x00_000000, 0x7f_7f7f7f, 0xff_ffffff]);
+        assert_eq!(base, [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]);
     }
 }

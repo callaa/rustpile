@@ -1,6 +1,6 @@
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
-use super::{rasterop, Blendmode, BrushMask, Color, Layer, LayerID, Rectangle, UserID};
+use super::{rasterop, Blendmode, BrushMask, Pixel, Color, Layer, LayerID, Rectangle, UserID};
 
 /// A layer editing operation's area of effect.
 ///
@@ -124,7 +124,7 @@ pub fn draw_brush_dab(
 pub fn draw_image(
     layer: &mut Layer,
     user: UserID,
-    image: &[u32],
+    image: &[Pixel],
     rect: &Rectangle,
     opacity: f32,
     blendmode: Blendmode,
@@ -275,12 +275,13 @@ pub fn change_attributes(
 #[cfg(test)]
 mod tests {
     use super::super::BrushMask;
+    use super::super::color::ZERO_PIXEL;
     use super::*;
 
     #[test]
     fn test_fill_rect() {
-        let mut layer = Layer::new(0, 200, 200, &Color::from_pixel(0));
-        let pix = 0xffff0000;
+        let mut layer = Layer::new(0, 200, 200, &Color::TRANSPARENT);
+        let pix = [255, 255, 0, 0];
 
         fill_rect(
             &mut layer,
@@ -290,18 +291,18 @@ mod tests {
             &Rectangle::new(1, 1, 198, 198),
         );
 
-        assert_eq!(layer.pixel_at(100, 0), 0);
+        assert_eq!(layer.pixel_at(100, 0), ZERO_PIXEL);
 
-        assert_eq!(layer.pixel_at(0, 1), 0);
+        assert_eq!(layer.pixel_at(0, 1), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(1, 1), pix);
         assert_eq!(layer.pixel_at(198, 1), pix);
-        assert_eq!(layer.pixel_at(199, 1), 0);
+        assert_eq!(layer.pixel_at(199, 1), ZERO_PIXEL);
 
-        assert_eq!(layer.pixel_at(0, 198), 0);
+        assert_eq!(layer.pixel_at(0, 198), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(1, 198), pix);
         assert_eq!(layer.pixel_at(198, 198), pix);
-        assert_eq!(layer.pixel_at(199, 198), 0);
-        assert_eq!(layer.pixel_at(1, 199), 0);
+        assert_eq!(layer.pixel_at(199, 198), ZERO_PIXEL);
+        assert_eq!(layer.pixel_at(1, 199), ZERO_PIXEL);
     }
 
     #[test]
@@ -325,11 +326,11 @@ mod tests {
             Blendmode::Normal,
         );
 
-        let pix = 0xffffffffu32;
-        assert_eq!(layer.pixel_at(62, 62), 0);
+        let pix = [255, 255, 255, 255];
+        assert_eq!(layer.pixel_at(62, 62), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(63, 62), pix);
         assert_eq!(layer.pixel_at(64, 62), pix);
-        assert_eq!(layer.pixel_at(65, 62), 0);
+        assert_eq!(layer.pixel_at(65, 62), ZERO_PIXEL);
 
         assert_eq!(layer.pixel_at(62, 63), pix);
         assert_eq!(layer.pixel_at(63, 63), pix);
@@ -341,10 +342,10 @@ mod tests {
         assert_eq!(layer.pixel_at(64, 64), pix);
         assert_eq!(layer.pixel_at(65, 64), pix);
 
-        assert_eq!(layer.pixel_at(62, 65), 0);
+        assert_eq!(layer.pixel_at(62, 65), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(63, 65), pix);
         assert_eq!(layer.pixel_at(64, 65), pix);
-        assert_eq!(layer.pixel_at(65, 65), 0);
+        assert_eq!(layer.pixel_at(65, 65), ZERO_PIXEL);
     }
 
     #[test]

@@ -2,7 +2,8 @@ use std::fmt;
 use std::rc::Rc;
 
 use super::rectiter::{MutableRectIterator, RectIterator};
-use super::{rasterop, Blendmode, Color, Rectangle, UserID};
+use super::{rasterop, Blendmode, Rectangle, UserID};
+use super::color::*;
 
 pub const TILE_SIZE: u32 = 64;
 pub const TILE_SIZEI: i32 = TILE_SIZE as i32;
@@ -10,7 +11,7 @@ const TILE_LENGTH: usize = (TILE_SIZE * TILE_SIZE) as usize;
 
 #[derive(Clone)]
 pub struct TileData {
-    pub pixels: [u32; TILE_LENGTH],
+    pub pixels: [Pixel; TILE_LENGTH],
     pub last_touched_by: UserID,
 }
 
@@ -21,12 +22,12 @@ pub enum Tile {
 }
 
 static TRANSPARENT_DATA: TileData = TileData {
-    pixels: [0; TILE_LENGTH],
+    pixels: [ZERO_PIXEL; TILE_LENGTH],
     last_touched_by: 0,
 };
 
 impl TileData {
-    pub fn new(pixel: u32, user: UserID) -> TileData {
+    pub fn new(pixel: Pixel, user: UserID) -> TileData {
         TileData {
             pixels: [pixel; TILE_LENGTH],
             last_touched_by: user,
@@ -55,7 +56,7 @@ impl Tile {
     // If the color is transparent, a Blank tile is returned.
     pub fn new(color: &Color, user: UserID) -> Tile {
         let p = color.as_pixel();
-        if p == 0 {
+        if p[ALPHA_CHANNEL] == 0 {
             Tile::Blank
         } else {
             Tile::Bitmap(Rc::new(TileData::new(p, user)))
@@ -89,14 +90,14 @@ impl Tile {
     pub fn clone_data(&self) -> TileData {
         match self {
             Tile::Bitmap(td) => TileData::clone(td),
-            Tile::Blank => TileData::new(0, 0),
+            Tile::Blank => TileData::new(ZERO_PIXEL, 0),
         }
     }
 
     /// Check if all pixels of this tile are fully transparent
     pub fn is_blank(&self) -> bool {
         match self {
-            Tile::Bitmap(td) => td.pixels.iter().all(|&p| p == 0),
+            Tile::Bitmap(td) => td.pixels.iter().all(|&p| p[ALPHA_CHANNEL] == 0),
             Tile::Blank => true,
         }
     }
@@ -148,7 +149,7 @@ impl Tile {
 
     // Return a rect iterator to this tile's content
     // Note: you may want to check if this is a Blank tile first for optimization purposes
-    pub fn rect_iter(&self, r: &Rectangle) -> RectIterator<u32> {
+    pub fn rect_iter(&self, r: &Rectangle) -> RectIterator<Pixel> {
         debug_assert!(r.x >= 0 && r.y >= 0);
         debug_assert!(r.right() < TILE_SIZEI && r.bottom() < TILE_SIZEI);
 
@@ -162,7 +163,7 @@ impl Tile {
 
     // Return a mutable iterator to this tile's content
     // If this is a Blank tile, it is converted to a fully transparent Bitmap tile first.
-    pub fn rect_iter_mut(&mut self, user: UserID, r: &Rectangle) -> MutableRectIterator<u32> {
+    pub fn rect_iter_mut(&mut self, user: UserID, r: &Rectangle) -> MutableRectIterator<Pixel> {
         debug_assert!(r.x >= 0 && r.y >= 0);
         debug_assert!(r.right() < TILE_SIZEI && r.bottom() < TILE_SIZEI);
 
@@ -178,12 +179,12 @@ impl Tile {
         }
     }
 
-    pub fn pixel_at(&self, x: u32, y: u32) -> u32 {
+    pub fn pixel_at(&self, x: u32, y: u32) -> Pixel {
         debug_assert!(x < TILE_SIZE);
         debug_assert!(y < TILE_SIZE);
         match self {
             Tile::Bitmap(td) => td.pixels[(y * TILE_SIZE + x) as usize],
-            Tile::Blank => 0,
+            Tile::Blank => ZERO_PIXEL,
         }
     }
 
@@ -202,7 +203,7 @@ impl Tile {
             Tile::Bitmap(td) => {
                 for y in 0..TILE_SIZE {
                     for x in 0..TILE_SIZE {
-                        art.push(if td.pixels[(y * TILE_SIZE + x) as usize] == 0 {
+                        art.push(if td.pixels[(y * TILE_SIZE + x) as usize][0] == 0 {
                             '.'
                         } else {
                             'X'
@@ -236,7 +237,7 @@ impl fmt::Debug for Tile {
         match self {
             Tile::Bitmap(d) => write!(
                 f,
-                "Tile(pixels=[{:x}...{:x}], user={}, refs={})",
+                "Tile(pixels=[{:?}...{:?}], user={}, refs={})",
                 d.pixels[0],
                 d.pixels[TILE_LENGTH - 1],
                 d.last_touched_by,
@@ -304,7 +305,7 @@ mod tests {
 
         tile.rect_iter_mut(1, &Rectangle::new(0, 0, 3, 3))
             .flatten()
-            .for_each(|p| *p = 0xffffffff);
+            .for_each(|p| *p = [255, 255, 255, 255]);
         assert_eq!(tile.solid_color(), None);
         assert!(!tile.is_blank());
     }

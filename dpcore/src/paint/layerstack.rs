@@ -2,7 +2,8 @@ use std::rc::Rc;
 
 use super::annotation::Annotation;
 use super::tile::{Tile, TileData, TILE_SIZE};
-use super::{Color, Layer};
+use super::color::{Pixel, ZERO_PIXEL, Color};
+use super::Layer;
 
 #[derive(Clone)]
 pub struct LayerStack {
@@ -94,7 +95,7 @@ impl LayerStack {
     }
 
     // Convert to a flat image
-    pub fn to_image(&self) -> (Vec<u32>, u32, u32) {
+    pub fn to_image(&self) -> (Vec<Pixel>, u32, u32) {
         let xtiles = Tile::div_up(self.width) as usize;
         let ytiles = Tile::div_up(self.height) as usize;
 
@@ -102,7 +103,7 @@ impl LayerStack {
         let width = self.width as usize;
         let height = self.height as usize;
 
-        let mut image = vec![0u32; width * height];
+        let mut image = vec![ZERO_PIXEL; width * height];
 
         for j in 0..ytiles {
             let h = tw.min(height - (j * tw));

@@ -1,5 +1,6 @@
 use dpcore::canvas::CanvasState;
 use dpcore::protocol::{open_recording, Compatibility, ReadMessage};
+use dpcore::paint::color::*;
 
 use tracing::{info, warn};
 
@@ -79,16 +80,15 @@ pub fn render_recording(opts: &RenderOpts) -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-fn save_image(filename: &str, image: &[u32], width: u32, height: u32) -> io::Result<()> {
+fn save_image(filename: &str, image: &[Pixel], width: u32, height: u32) -> io::Result<()> {
     assert_eq!(image.len(), width as usize * height as usize);
     let mut rgba = Vec::<u8>::with_capacity(width as usize * height as usize * 4);
 
-    // TODO pixel data in layers should be stored in a better format
     for px in image.iter() {
-        rgba.push(((px & 0x00ff0000) >> 16) as u8);
-        rgba.push(((px & 0x0000ff00) >> 8) as u8);
-        rgba.push(((px & 0x000000ff) >> 0) as u8);
-        rgba.push(((px & 0xff000000) >> 24) as u8);
+        rgba.push(px[RED_CHANNEL]);
+        rgba.push(px[GREEN_CHANNEL]);
+        rgba.push(px[BLUE_CHANNEL]);
+        rgba.push(px[ALPHA_CHANNEL]);
     }
 
     image::save_buffer(filename, &rgba, width, height, image::RGBA(8))

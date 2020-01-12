@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::rc::Rc;
 
 use super::blendmode::Blendmode;
-use super::color::Color;
+use super::color::{Pixel, Color};
 use super::rect::Rectangle;
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TileData, TILE_SIZE, TILE_SIZEI};
@@ -52,7 +52,7 @@ impl Layer {
     /// Build a layer from raw pixel data
     /// This is typically used for scratch layers as a part of some
     /// larger image manipulation process.
-    pub fn from_image(pixels: &[u32], width: u32, height: u32) -> Layer {
+    pub fn from_image(pixels: &[Pixel], width: u32, height: u32) -> Layer {
         let xtiles = Tile::div_up(width);
         let ytiles = Tile::div_up(height);
 
@@ -141,7 +141,7 @@ impl Layer {
     }
 
     /// Return the pixel at the given coordinates
-    pub fn pixel_at(&self, x: u32, y: u32) -> u32 {
+    pub fn pixel_at(&self, x: u32, y: u32) -> Pixel {
         let ti = x / TILE_SIZE;
         let tj = y / TILE_SIZE;
         let tx = x - ti * TILE_SIZE;
@@ -358,17 +358,21 @@ mod tests {
 
     #[test]
     fn test_from_small_image() {
-        let image = [1, 2, 3, 11, 12, 13];
+        #[rustfmt::skip]
+        let image = [
+            [0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 0, 3],
+            [0, 0, 1, 1], [0, 0, 1, 2], [0, 0, 1, 3],
+        ];
         let layer = Layer::from_image(&image, 3, 2);
-        assert_eq!(layer.pixel_at(0, 0), 1);
-        assert_eq!(layer.pixel_at(1, 0), 2);
-        assert_eq!(layer.pixel_at(2, 0), 3);
-        assert_eq!(layer.pixel_at(3, 0), 0);
-        assert_eq!(layer.pixel_at(0, 1), 11);
-        assert_eq!(layer.pixel_at(1, 1), 12);
-        assert_eq!(layer.pixel_at(2, 1), 13);
-        assert_eq!(layer.pixel_at(3, 1), 0);
-        assert_eq!(layer.pixel_at(0, 2), 0);
+        assert_eq!(layer.pixel_at(0, 0), [0, 0, 0, 1]);
+        assert_eq!(layer.pixel_at(1, 0), [0, 0, 0, 2]);
+        assert_eq!(layer.pixel_at(2, 0), [0, 0, 0, 3]);
+        assert_eq!(layer.pixel_at(3, 0), [0, 0, 0, 0]);
+        assert_eq!(layer.pixel_at(0, 1), [0, 0, 1, 1]);
+        assert_eq!(layer.pixel_at(1, 1), [0, 0, 1, 2]);
+        assert_eq!(layer.pixel_at(2, 1), [0, 0, 1, 3]);
+        assert_eq!(layer.pixel_at(3, 1), [0, 0, 0, 0]);
+        assert_eq!(layer.pixel_at(0, 2), [0, 0, 0, 0]);
     }
 
     #[test]
@@ -391,7 +395,7 @@ mod tests {
             .tile_mut(0, 0)
             .rect_iter_mut(0, &Rectangle::new(1, 1, 1, 1))
             .next()
-            .unwrap()[0] = 0xff_ffffff;
+            .unwrap()[0] = [255, 255, 255, 255];
 
         let layer2 = layer.resized(TILE_SIZEI, TILE_SIZEI, 2 * TILE_SIZEI, TILE_SIZEI);
 
@@ -433,7 +437,7 @@ mod tests {
                     .tile_mut(x, y)
                     .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
                     .next()
-                    .unwrap()[0] = 0xff_ffffff;
+                    .unwrap()[0] = [255, 255, 255, 255];
             }
         }
 

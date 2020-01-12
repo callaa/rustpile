@@ -1,13 +1,13 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use dpcore::paint::{rasterop, Blendmode, BrushMask};
+use dpcore::paint::{rasterop, Blendmode, Pixel, BrushMask};
 
 fn mask_blend(mask: &[u8], mode: Blendmode) {
-    let mut base = [0x80_808080_u32;64*64];
-    rasterop::mask_blend(&mut base, 0xff_ffffff, mask, mode);
+    let mut base = [[128, 128, 128, 128];64*64];
+    rasterop::mask_blend(&mut base, [255, 255, 255, 255], mask, mode);
 }
 
-fn pixel_blend(over: &[u32], mode: Blendmode) {
-    let mut base = [0x80_808080_u32;64*64];
+fn pixel_blend(over: &[Pixel], mode: Blendmode) {
+    let mut base = [[128, 128, 128, 128];64*64];
     rasterop::pixel_blend(&mut base, over, 128, mode);
 }
 
@@ -22,7 +22,7 @@ fn mask_blend_benchmark(c: &mut Criterion) {
 }
 
 fn pixel_blend_benchmark(c: &mut Criterion) {
-    let over = vec![0xff_ffffffu32;64*64];
+    let over = vec![[255, 255, 255, 255];64*64];
 
     c.bench_function("pixel normal", |b| b.iter(|| pixel_blend(&over, Blendmode::Normal)));
     c.bench_function("pixel erase", |b| b.iter(|| pixel_blend(&over, Blendmode::Erase)));
