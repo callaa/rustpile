@@ -6,6 +6,7 @@ pub const GREEN_CHANNEL: usize = 2;
 pub const BLUE_CHANNEL: usize = 3;
 pub const RGB_CHANNELS: std::ops::RangeInclusive<usize> = 1..=3;
 pub const ZERO_PIXEL: Pixel = [0, 0, 0, 0];
+pub const WHITE_PIXEL: Pixel = [255, 255, 255, 255];
 
 #[derive(Copy, Clone, Debug)]
 pub struct Color {

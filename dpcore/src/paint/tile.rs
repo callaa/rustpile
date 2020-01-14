@@ -305,7 +305,7 @@ mod tests {
 
         tile.rect_iter_mut(1, &Rectangle::new(0, 0, 3, 3))
             .flatten()
-            .for_each(|p| *p = [255, 255, 255, 255]);
+            .for_each(|p| *p = WHITE_PIXEL);
         assert_eq!(tile.solid_color(), None);
         assert!(!tile.is_blank());
     }

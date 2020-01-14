@@ -275,18 +275,17 @@ pub fn change_attributes(
 #[cfg(test)]
 mod tests {
     use super::super::BrushMask;
-    use super::super::color::ZERO_PIXEL;
+    use super::super::color::{ZERO_PIXEL, WHITE_PIXEL};
     use super::*;
 
     #[test]
     fn test_fill_rect() {
         let mut layer = Layer::new(0, 200, 200, &Color::TRANSPARENT);
-        let pix = [255, 255, 0, 0];
 
         fill_rect(
             &mut layer,
             0,
-            &Color::from_pixel(pix),
+            &Color::from_pixel(WHITE_PIXEL),
             Blendmode::Normal,
             &Rectangle::new(1, 1, 198, 198),
         );
@@ -294,13 +293,13 @@ mod tests {
         assert_eq!(layer.pixel_at(100, 0), ZERO_PIXEL);
 
         assert_eq!(layer.pixel_at(0, 1), ZERO_PIXEL);
-        assert_eq!(layer.pixel_at(1, 1), pix);
-        assert_eq!(layer.pixel_at(198, 1), pix);
+        assert_eq!(layer.pixel_at(1, 1), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(198, 1), WHITE_PIXEL);
         assert_eq!(layer.pixel_at(199, 1), ZERO_PIXEL);
 
         assert_eq!(layer.pixel_at(0, 198), ZERO_PIXEL);
-        assert_eq!(layer.pixel_at(1, 198), pix);
-        assert_eq!(layer.pixel_at(198, 198), pix);
+        assert_eq!(layer.pixel_at(1, 198), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(198, 198), WHITE_PIXEL);
         assert_eq!(layer.pixel_at(199, 198), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(1, 199), ZERO_PIXEL);
     }
@@ -326,25 +325,24 @@ mod tests {
             Blendmode::Normal,
         );
 
-        let pix = [255, 255, 255, 255];
         assert_eq!(layer.pixel_at(62, 62), ZERO_PIXEL);
-        assert_eq!(layer.pixel_at(63, 62), pix);
-        assert_eq!(layer.pixel_at(64, 62), pix);
+        assert_eq!(layer.pixel_at(63, 62), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(64, 62), WHITE_PIXEL);
         assert_eq!(layer.pixel_at(65, 62), ZERO_PIXEL);
 
-        assert_eq!(layer.pixel_at(62, 63), pix);
-        assert_eq!(layer.pixel_at(63, 63), pix);
-        assert_eq!(layer.pixel_at(64, 63), pix);
-        assert_eq!(layer.pixel_at(65, 63), pix);
+        assert_eq!(layer.pixel_at(62, 63), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(63, 63), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(64, 63), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(65, 63), WHITE_PIXEL);
 
-        assert_eq!(layer.pixel_at(62, 64), pix);
-        assert_eq!(layer.pixel_at(63, 64), pix);
-        assert_eq!(layer.pixel_at(64, 64), pix);
-        assert_eq!(layer.pixel_at(65, 64), pix);
+        assert_eq!(layer.pixel_at(62, 64), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(63, 64), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(64, 64), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(65, 64), WHITE_PIXEL);
 
         assert_eq!(layer.pixel_at(62, 65), ZERO_PIXEL);
-        assert_eq!(layer.pixel_at(63, 65), pix);
-        assert_eq!(layer.pixel_at(64, 65), pix);
+        assert_eq!(layer.pixel_at(63, 65), WHITE_PIXEL);
+        assert_eq!(layer.pixel_at(64, 65), WHITE_PIXEL);
         assert_eq!(layer.pixel_at(65, 65), ZERO_PIXEL);
     }
 

@@ -329,6 +329,7 @@ impl Layer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::color::WHITE_PIXEL;
 
     #[test]
     fn test_tilevector_cow() {
@@ -395,7 +396,7 @@ mod tests {
             .tile_mut(0, 0)
             .rect_iter_mut(0, &Rectangle::new(1, 1, 1, 1))
             .next()
-            .unwrap()[0] = [255, 255, 255, 255];
+            .unwrap()[0] = WHITE_PIXEL;
 
         let layer2 = layer.resized(TILE_SIZEI, TILE_SIZEI, 2 * TILE_SIZEI, TILE_SIZEI);
 
@@ -437,7 +438,7 @@ mod tests {
                     .tile_mut(x, y)
                     .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
                     .next()
-                    .unwrap()[0] = [255, 255, 255, 255];
+                    .unwrap()[0] = WHITE_PIXEL;
             }
         }
 
