@@ -12,7 +12,7 @@ use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
 
-pub static VERSION: &'static str = "{{ version }}";
+pub static VERSION: &str = "{{ version }}";
 pub const UNDO_DEPTH: u32 = {{ undo_depth }};
 
 {# ### STRUCTS FOR MESSAGES WITH NONTRIVIAL PAYLOADS ### #}
@@ -43,11 +43,11 @@ impl {{ message.name }}Message {
 
     {# ADD FLAG CONSTANTS #}
     {% for field in message.fields %}{% if field.flags %}
-    {% for flag in field.flags %}
-    pub const {{ field.name.upper() }}_{{ flag.upper() }}: {{ field.field_type }} = 0x{{ '%.x' | format(loop.index0) }};
+    {% for flagname, flagbit in field.flags %}
+    pub const {{ field.name.upper() }}_{{ flagname.upper() }}: {{ field.field_type }} = 0x{{ '%.x' | format(flagbit) }};
     {% endfor %}
     pub const {{ field.name.upper() }}: &'static [&'static str] = &[
-    {% for flag in field.flags %}"{{ flag }}", {% endfor %}];
+    {% for flagname, flagbit in field.flags %}"{{ flagname }}", {% endfor %}];
     {% endif %}{% endfor %}
 
     {# (DE)SERIALIZATION FUNCTIONS #}

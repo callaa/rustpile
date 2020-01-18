@@ -5,7 +5,7 @@ use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
 
-pub static VERSION: &'static str = "dp:4.21.2";
+pub static VERSION: &str = "dp:4.21.2";
 pub const UNDO_DEPTH: u32 = 30;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,9 +53,9 @@ pub struct JoinMessage {
 }
 
 impl JoinMessage {
-    pub const FLAGS_AUTH: u8 = 0x0;
-    pub const FLAGS_MOD: u8 = 0x1;
-    pub const FLAGS_BOT: u8 = 0x2;
+    pub const FLAGS_AUTH: u8 = 0x1;
+    pub const FLAGS_MOD: u8 = 0x2;
+    pub const FLAGS_BOT: u8 = 0x4;
     pub const FLAGS: &'static [&'static str] = &["auth", "mod", "bot"];
 
     fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {
@@ -117,10 +117,10 @@ pub struct ChatMessage {
 }
 
 impl ChatMessage {
-    pub const FLAGS_BYPASS: u8 = 0x0;
-    pub const FLAGS_SHOUT: u8 = 0x1;
-    pub const FLAGS_ACTION: u8 = 0x2;
-    pub const FLAGS_PIN: u8 = 0x3;
+    pub const FLAGS_BYPASS: u8 = 0x1;
+    pub const FLAGS_SHOUT: u8 = 0x2;
+    pub const FLAGS_ACTION: u8 = 0x4;
+    pub const FLAGS_PIN: u8 = 0x8;
     pub const FLAGS: &'static [&'static str] = &["bypass", "shout", "action", "pin"];
 
     fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {
@@ -161,7 +161,7 @@ pub struct PrivateChatMessage {
 }
 
 impl PrivateChatMessage {
-    pub const FLAGS_ACTION: u8 = 0x0;
+    pub const FLAGS_ACTION: u8 = 0x1;
     pub const FLAGS: &'static [&'static str] = &["action"];
 
     fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {
@@ -384,8 +384,8 @@ pub struct LayerCreateMessage {
 }
 
 impl LayerCreateMessage {
-    pub const FLAGS_COPY: u8 = 0x0;
-    pub const FLAGS_INSERT: u8 = 0x1;
+    pub const FLAGS_COPY: u8 = 0x1;
+    pub const FLAGS_INSERT: u8 = 0x2;
     pub const FLAGS: &'static [&'static str] = &["copy", "insert"];
 
     fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {
@@ -446,8 +446,8 @@ pub struct LayerAttributesMessage {
 }
 
 impl LayerAttributesMessage {
-    pub const FLAGS_CENSOR: u8 = 0x0;
-    pub const FLAGS_FIXED: u8 = 0x1;
+    pub const FLAGS_CENSOR: u8 = 0x1;
+    pub const FLAGS_FIXED: u8 = 0x2;
     pub const FLAGS: &'static [&'static str] = &["censor", "fixed"];
 
     fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {

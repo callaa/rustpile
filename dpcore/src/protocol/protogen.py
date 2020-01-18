@@ -166,7 +166,7 @@ FieldBool = IntegerField.F('bool', 1)
 class FieldFlags(Field):
     def __init__(self, name, attributes, **kwargs):
         super().__init__(name)
-        self.flags = attributes['_type_params']
+        self.flags = [(v, 1<<i) for i,v in enumerate(attributes['_type_params'])]
         if len(self.flags) <= 8:
             minlen = 1
         elif len(self.flags) <= 16:
