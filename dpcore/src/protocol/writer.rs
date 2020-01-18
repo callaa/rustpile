@@ -63,13 +63,13 @@ impl<W: Write> TextWriter<W> {
 impl<W: Write> RecordingWriter for TextWriter<W> {
     fn write_header(&mut self, metadata: &HashMap<String, String>) -> io::Result<()> {
         for (k, v) in metadata.iter() {
-            write!(self.file, "!{}={}\n", k, v)?;
+            writeln!(self.file, "!{}={}", k, v)?;
         }
         Ok(())
     }
 
     fn write_message(&mut self, m: &Message) -> io::Result<()> {
-        write!(self.file, "{}\n", m.as_text())
+        writeln!(self.file, "{}", m.as_text())
     }
 }
 

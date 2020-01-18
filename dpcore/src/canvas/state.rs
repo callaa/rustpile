@@ -155,7 +155,7 @@ impl CanvasState {
         }
     }
 
-    fn handle_background(&mut self, pixels: &Vec<u8>) {
+    fn handle_background(&mut self, pixels: &[u8]) {
         let tile = if pixels.len() == 4 {
             let color = Color::from_argb32(u32::from_be_bytes(pixels[..].try_into().unwrap()));
             Tile::new(&color, 0)

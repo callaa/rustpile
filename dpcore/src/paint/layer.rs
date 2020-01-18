@@ -249,7 +249,7 @@ impl Layer {
 
             // TODO tint, highlight and onionskin
 
-            destination.merge_data(&mut tmp, self.opacity, self.blendmode);
+            destination.merge_data(&tmp, self.opacity, self.blendmode);
         }
     }
 

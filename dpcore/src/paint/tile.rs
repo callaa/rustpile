@@ -78,11 +78,12 @@ impl Tile {
         match self {
             Tile::Bitmap(td) => {
                 let pix = td.pixels[0];
-                match td.pixels.into_iter().all(|&p| p == pix) {
-                    true => Some(Color::from_pixel(pix)),
-                    false => None,
+                if td.pixels.iter().all(|&p| p == pix) {
+                    Some(Color::from_pixel(pix))
+                } else {
+                    None
                 }
-            }
+            },
             Tile::Blank => Some(Color::TRANSPARENT),
         }
     }
@@ -111,7 +112,7 @@ impl Tile {
     }
 
     // Fill this tile with a solid color
-    pub fn fill(&mut self, color: &Color, user: UserID) -> () {
+    pub fn fill(&mut self, color: &Color, user: UserID) {
         if color.a == 0.0 {
             *self = Tile::Blank
         } else {

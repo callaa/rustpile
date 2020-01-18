@@ -211,7 +211,7 @@ impl History {
 
     pub fn add_savepoint(&mut self, layerstack: Rc<LayerStack>) {
         self.savepoints.push(Savepoint {
-            layerstack: layerstack,
+            layerstack,
             seq_num: self.sequence,
         });
     }

@@ -202,7 +202,7 @@ impl<'a> MessageReader<'a> {
     }
 
     pub fn read_str(&mut self, len: usize) -> String {
-        String::from_utf8(self.read_vec::<u8>(len)).unwrap_or(String::new())
+        String::from_utf8(self.read_vec::<u8>(len)).unwrap_or_default()
     }
 
     pub fn read_remaining_str(&mut self) -> String {

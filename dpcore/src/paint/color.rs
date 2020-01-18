@@ -25,12 +25,12 @@ impl Color {
     };
 
     pub fn rgb8(r: u8, g: u8, b: u8) -> Color {
-        return Color {
+        Color {
             r: r as f32 / 255.0,
             g: g as f32 / 255.0,
             b: b as f32 / 255.0,
             a: 1.0,
-        };
+        }
     }
 
     pub fn from_argb32(c: u32) -> Color {

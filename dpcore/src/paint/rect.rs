@@ -33,12 +33,12 @@ impl Rectangle {
         let x1 = max(self.right(), other.right());
         let y1 = max(self.bottom(), other.bottom());
 
-        return Rectangle {
+        Rectangle {
             x: x0,
             y: y0,
             w: x1 - x0 + 1,
             h: y1 - y0 + 1,
-        };
+        }
     }
 
     pub fn cropped(&self, w: u32, h: u32) -> Option<Rectangle> {

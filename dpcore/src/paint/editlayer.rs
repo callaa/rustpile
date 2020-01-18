@@ -218,8 +218,8 @@ pub fn merge(target_layer: &mut Layer, source_layer: &Layer) -> AoE {
 
     // TODO this is parallelizable
     target_tiles
-        .into_iter()
-        .zip(source_tiles.into_iter())
+        .iter_mut()
+        .zip(source_tiles.iter())
         .for_each(|(d, s)| d.merge(s, source_layer.opacity, source_layer.blendmode));
 
     if source_layer.is_visible() {

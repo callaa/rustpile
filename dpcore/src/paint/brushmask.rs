@@ -21,10 +21,10 @@ impl ClassicBrushCache {
 
     fn get_cached_lut(&mut self, hardness: f32) -> &[f32] {
         let h = (hardness * 100.0) as usize;
-        if self.lut[h].len() == 0 {
+        if self.lut[h].is_empty() {
             self.lut[h] = make_gimp_style_brush_lut(hardness);
         }
-        return &self.lut[h];
+        &self.lut[h]
     }
 }
 
@@ -87,22 +87,21 @@ impl BrushMask {
         let mut xfrac = x - fx;
         let mut yfrac = y - fy;
 
-        let ix;
-        if xfrac < 0.5 {
+        let ix = if xfrac < 0.5 {
             xfrac += 0.5;
-            ix = (fx - 1.0 - offset) as i32;
+            (fx - 1.0 - offset) as i32
         } else {
             xfrac -= 0.5;
-            ix = (fx - offset) as i32;
-        }
-        let iy;
-        if yfrac < 0.5 {
+            (fx - offset) as i32
+        };
+
+        let iy = if yfrac < 0.5 {
             yfrac += 0.5;
-            iy = (fy - 1.0 - offset) as i32;
+            (fy - 1.0 - offset) as i32
         } else {
             yfrac -= 0.5;
-            iy = (fy - offset) as i32;
-        }
+            (fy - offset) as i32
+        };
 
         (ix, iy, mask.offset(xfrac, yfrac))
     }
@@ -199,9 +198,7 @@ impl BrushMask {
         }
 
         // empirically determined fudge factors to make small brushes look nice
-        if radius < 2.5 {
-            fudge = 0.8;
-        } else if radius < 4.0 {
+        if radius < 4.0 {
             fudge = 0.8;
         }
 
@@ -286,12 +283,11 @@ const LUT_RADIUS: f32 = 128.0;
 // The value at r² (where r is distance from brush center, scaled to LUT_RADIUS) is
 // the opaqueness of the pixel.
 fn make_gimp_style_brush_lut(hardness: f32) -> Vec<f32> {
-    let exponent;
-    if (1.0 - hardness) < 0.0000004 {
-        exponent = 1000000.0f32;
+    let exponent = if (1.0 - hardness) < 0.000_000_4 {
+        1_000_000.0f32
     } else {
-        exponent = 0.4 / (1.0 - hardness);
-    }
+        0.4 / (1.0 - hardness)
+    };
 
     let lut_size = (LUT_RADIUS * LUT_RADIUS) as usize;
     Vec::<f32>::from_iter(

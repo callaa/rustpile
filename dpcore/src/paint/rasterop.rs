@@ -67,7 +67,7 @@ fn u8_mult(a: u32, b: u32) -> u32 {
 fn alpha_pixel_blend(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         let bp = dp.into_work();
         let src = sp.into_work();
         let a_s = 255 - u8_mult(src[ALPHA_CHANNEL], o);
@@ -87,7 +87,7 @@ fn alpha_pixel_blend(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
 fn alpha_pixel_under(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         let bp = dp.into_work();
         let src = sp.into_work();
         let a_s = u8_mult(255 - bp[ALPHA_CHANNEL], u8_mult(src[ALPHA_CHANNEL], o));
@@ -109,7 +109,7 @@ fn alpha_mask_under(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
     let c = color.into_work();
 
-    for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
+    for (dp, &mask) in base.iter_mut().zip(mask.iter()) {
         let bp = dp.into_work();
         let m = mask as u32;
         let a = u8_mult(255 - bp[0], m);
@@ -168,7 +168,7 @@ fn color_erase(dest: &mut Color, color: &Color) {
 fn pixel_color_erase(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as f32 / 255.0;
 
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         // TODO optimize this?
         let mut dc = Color::from_pixel(*dp);
         let mut sc = Color::from_pixel(*sp);
@@ -180,7 +180,7 @@ fn pixel_color_erase(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
 
 fn mask_color_erase(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     let mut c = Color::from_pixel(color);
-    for (dp, &mp) in base.into_iter().zip(mask.into_iter()) {
+    for (dp, &mp) in base.iter_mut().zip(mask.iter()) {
         // TODO optimize this?
         let mut dc = Color::from_pixel(*dp);
         c.a = mp as f32 / 255.0;
@@ -192,7 +192,7 @@ fn mask_color_erase(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
 fn pixel_replace(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         let src = sp.into_work();
         *dp = [
             u8_mult(src[0], o) as u8,
@@ -209,7 +209,7 @@ fn alpha_mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
     let c = color.into_work();
 
-    for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
+    for (dp, &mask) in base.iter_mut().zip(mask.iter()) {
         let bp = dp.into_work();
         let m = mask as u32;
         let a = 255 - m;
@@ -229,7 +229,7 @@ fn alpha_mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
 fn alpha_mask_erase(base: &mut [Pixel], mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
 
-    for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
+    for (dp, &mask) in base.iter_mut().zip(mask.iter()) {
         let mut dest = dp.into_work();
         let m = mask as u32;
         let a = 255 - m;
@@ -245,7 +245,7 @@ fn alpha_mask_erase(base: &mut [Pixel], mask: &[u8]) {
 fn alpha_pixel_erase(base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let o = opacity as u32;
 
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         let a = 255 - u8_mult(sp[ALPHA_CHANNEL] as u32, o);
         let bp = dp.into_work();
         let result = [
@@ -271,37 +271,37 @@ fn comp_op_divide(a: f32, b: f32) -> f32 {
 }
 
 fn comp_op_darken(a: f32, b: f32) -> f32 {
-    return a.min(b);
+    a.min(b)
 }
 
 fn comp_op_lighten(a: f32, b: f32) -> f32 {
-    return a.max(b);
+    a.max(b)
 }
 
 fn comp_op_dodge(a: f32, b: f32) -> f32 {
-    return 1.0f32.min(a / (1.001 - b));
+    1.0f32.min(a / (1.001 - b))
 }
 
 fn comp_op_burn(a: f32, b: f32) -> f32 {
-    return 0.0f32.max(1.0f32.min(1.0 - ((1.0 - a) / (b + 0.001))));
+    0.0f32.max(1.0f32.min(1.0 - ((1.0 - a) / (b + 0.001))))
 }
 
 fn comp_op_add(a: f32, b: f32) -> f32 {
-    return 1.0f32.min(a + b);
+    1.0f32.min(a + b)
 }
 
 fn comp_op_subtract(a: f32, b: f32) -> f32 {
-    return 0.0f32.max(a - b);
+    0.0f32.max(a - b)
 }
 
 fn comp_op_recolor(_: f32, b: f32) -> f32 {
-    return b;
+    b
 }
 
 /// Generic alpha-preserving compositing operations
 fn pixel_composite(comp_op: fn(f32, f32) -> f32, base: &mut [Pixel], over: &[Pixel], opacity: u8) {
     let of = opacity as f32 / 255.0;
-    for (dp, sp) in base.into_iter().zip(over.into_iter()) {
+    for (dp, sp) in base.iter_mut().zip(over.iter()) {
         // TODO optimize this. These operations need non-premultiplied color
         let mut dc = Color::from_pixel(*dp);
         let sc = Color::from_pixel(*sp);
@@ -319,7 +319,7 @@ fn pixel_composite(comp_op: fn(f32, f32) -> f32, base: &mut [Pixel], over: &[Pix
 fn mask_composite(comp_op: fn(f32, f32) -> f32, base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     debug_assert!(base.len() == mask.len());
     let c = Color::from_pixel(color);
-    for (dp, &mask) in base.into_iter().zip(mask.into_iter()) {
+    for (dp, &mask) in base.iter_mut().zip(mask.iter()) {
         let mut d = Color::from_pixel(*dp);
         let m = mask as f32 / 255.0;
 

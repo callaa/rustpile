@@ -235,7 +235,7 @@ impl fmt::Display for TextMessage {
             for (key, value) in &self.args {
                 if value.chars().any(char::is_whitespace) {
                     for line in value.lines() {
-                        write!(f, "    {}={}\n", key, line)?;
+                        writeln!(f, "    {}={}", key, line)?;
                     }
                 }
             }
@@ -245,7 +245,7 @@ impl fmt::Display for TextMessage {
                 for c in dab.iter() {
                     write!(f, " {}", c)?;
                 }
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
             f.write_str("}")?;
         }
