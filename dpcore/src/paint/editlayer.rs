@@ -1,6 +1,6 @@
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
-use super::{rasterop, Blendmode, BrushMask, Pixel, Color, Layer, LayerID, Rectangle, UserID};
+use super::{rasterop, Blendmode, BrushMask, Color, Layer, LayerID, Pixel, Rectangle, UserID};
 
 /// A layer editing operation's area of effect.
 ///
@@ -274,8 +274,8 @@ pub fn change_attributes(
 
 #[cfg(test)]
 mod tests {
+    use super::super::color::{WHITE_PIXEL, ZERO_PIXEL};
     use super::super::BrushMask;
-    use super::super::color::{ZERO_PIXEL, WHITE_PIXEL};
     use super::*;
 
     #[test]

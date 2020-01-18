@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::rc::Rc;
 
 use super::blendmode::Blendmode;
-use super::color::{Pixel, Color};
+use super::color::{Color, Pixel};
 use super::rect::Rectangle;
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TileData, TILE_SIZE, TILE_SIZEI};
@@ -328,8 +328,8 @@ impl Layer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::color::WHITE_PIXEL;
+    use super::*;
 
     #[test]
     fn test_tilevector_cow() {

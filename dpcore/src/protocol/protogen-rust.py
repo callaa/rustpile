@@ -13,13 +13,14 @@ use std::convert::TryInto;
 use std::fmt;
 
 pub static VERSION: &'static str = "{{ version }}";
+pub const UNDO_DEPTH: u32 = {{ undo_depth }};
 
 {# ### STRUCTS FOR MESSAGES WITH NONTRIVIAL PAYLOADS ### #}
 {% for message in messages %}{% if message.fields|length > 1 %}
 
 {# THE STRUCT FIELD TYPE IS USED FOR DAB DATA ONLY (AT THE MOMENT) #}
 {% if message.fields[-1].subfields %}{% set sfield = message.fields[-1] %}
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct {{ sfield.struct_name }} {
     {% for f in sfield.subfields %}
     pub {{ f.name }}: {{ field_rust_type(f) }},
@@ -27,7 +28,7 @@ pub struct {{ sfield.struct_name }} {
 }
 {% endif %}
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct {{ message.name }}Message {
     {% for f in message.fields %}
     pub {{ f.name }}: {{ field_rust_type(f) }},
@@ -150,7 +151,7 @@ impl {{ message.name }}Message {
 {% endif %}{% endfor %}{# messages with more than one field #}
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Body {
     {% for message in messages %}
     {{ comment(message.comment) }}
@@ -167,7 +168,7 @@ pub enum Body {
     {% endfor %}{# messages #}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub user_id: u8,
     pub body: Body
@@ -422,6 +423,7 @@ if __name__ == '__main__':
     print(template.render(
         messages=protocol['messages'],
         version=protocol['version'],
+        undo_depth=protocol['undo_depth'],
         field_rust_type=field_rust_type,
         read_field=read_field,
         write_field=write_field,

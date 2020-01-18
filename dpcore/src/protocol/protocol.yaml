@@ -1,5 +1,6 @@
 _protocol:
     version: dp:4.21.2
+    undo_depth: 30
 
 # Control messages (transparent)
 Command:

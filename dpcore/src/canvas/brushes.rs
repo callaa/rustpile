@@ -57,12 +57,7 @@ fn drawdabs_classic_draw(
     }
 }
 
-pub fn drawdabs_pixel(
-    layer: &mut Layer,
-    user: UserID,
-    dabs: &DrawDabsPixelMessage,
-    square: bool
-) {
+pub fn drawdabs_pixel(layer: &mut Layer, user: UserID, dabs: &DrawDabsPixelMessage, square: bool) {
     let mode = Blendmode::try_from(dabs.mode).unwrap_or(Blendmode::Normal);
     let mut color = Color::from_argb32(dabs.color);
 
@@ -86,7 +81,7 @@ fn drawdabs_pixel_draw(
     color: Color,
     mode: Blendmode,
     dabs: &DrawDabsPixelMessage,
-    square: bool
+    square: bool,
 ) {
     let mut mask = BrushMask {
         diameter: 0,
@@ -107,7 +102,7 @@ fn drawdabs_pixel_draw(
             last_opacity = dab.opacity;
             mask = if square {
                 BrushMask::new_square_pixel(dab.size as u32, dab.opacity as f32 / 255.0)
-            }  else {
+            } else {
                 BrushMask::new_round_pixel(dab.size as u32, dab.opacity as f32 / 255.0)
             };
         }

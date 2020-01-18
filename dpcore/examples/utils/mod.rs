@@ -1,6 +1,6 @@
+use dpcore::paint::color::*;
 use dpcore::paint::tile::{Tile, TileData, TILE_SIZE};
 use dpcore::paint::{Layer, LayerStack};
-use dpcore::paint::color::*;
 use image;
 use image::{ImageBuffer, RgbaImage};
 

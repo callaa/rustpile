@@ -1,5 +1,5 @@
-use super::Blendmode;
 use super::color::*;
+use super::Blendmode;
 
 pub fn pixel_blend(base: &mut [Pixel], over: &[Pixel], opacity: u8, mode: Blendmode) {
     match mode {
@@ -40,20 +40,15 @@ pub fn mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8], mode: Blendmode
 }
 
 trait ScratchArray {
-    fn into_work(self) -> [u32;4];
-    fn from_work(p: [u32;4]) -> Self;
+    fn into_work(self) -> [u32; 4];
+    fn from_work(p: [u32; 4]) -> Self;
 }
 
 impl ScratchArray for Pixel {
-    fn from_work(p: [u32;4]) -> Self {
-        [
-            p[0] as u8,
-            p[1] as u8,
-            p[2] as u8,
-            p[3] as u8,
-        ]
+    fn from_work(p: [u32; 4]) -> Self {
+        [p[0] as u8, p[1] as u8, p[2] as u8, p[3] as u8]
     }
-    fn into_work(self) -> [u32;4] {
+    fn into_work(self) -> [u32; 4] {
         [
             self[0] as u32,
             self[1] as u32,
@@ -359,23 +354,40 @@ mod tests {
         let mask = [0xff, 0x80, 0x40];
 
         alpha_mask_blend(&mut base, [0, 0, 255, 0], &mask);
-        assert_eq!(base, [[255, 0, 255, 0], [255, 127, 128, 0], [255, 191, 64, 0]]);
+        assert_eq!(
+            base,
+            [[255, 0, 255, 0], [255, 127, 128, 0], [255, 191, 64, 0]]
+        );
     }
 
     #[test]
     fn test_alpha_pixel_erase() {
-        let mut base = [[255, 255, 255, 255], [255, 255, 255, 255], [255, 255, 255, 255]];
+        let mut base = [
+            [255, 255, 255, 255],
+            [255, 255, 255, 255],
+            [255, 255, 255, 255],
+        ];
         let over = [[255, 1, 2, 3], [128, 1, 2, 3], [0, 1, 2, 3]];
 
         alpha_pixel_erase(&mut base, &over, 0xff);
-        assert_eq!(base, [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]);
+        assert_eq!(
+            base,
+            [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]
+        );
     }
     #[test]
     fn test_alpha_mask_erase() {
-        let mut base = [[255, 255, 255, 255], [255, 255, 255, 255], [255, 255,255, 255]];
+        let mut base = [
+            [255, 255, 255, 255],
+            [255, 255, 255, 255],
+            [255, 255, 255, 255],
+        ];
         let mask = [0xff, 0x80, 0x00];
 
         alpha_mask_erase(&mut base, &mask);
-        assert_eq!(base, [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]);
+        assert_eq!(
+            base,
+            [[0, 0, 0, 0], [127, 127, 127, 127], [255, 255, 255, 255]]
+        );
     }
 }

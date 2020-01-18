@@ -1,9 +1,9 @@
 use std::fmt;
 use std::rc::Rc;
 
+use super::color::*;
 use super::rectiter::{MutableRectIterator, RectIterator};
 use super::{rasterop, Blendmode, Rectangle, UserID};
-use super::color::*;
 
 pub const TILE_SIZE: u32 = 64;
 pub const TILE_SIZEI: i32 = TILE_SIZE as i32;

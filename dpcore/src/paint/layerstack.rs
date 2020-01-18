@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use super::annotation::Annotation;
+use super::color::{Color, Pixel, ZERO_PIXEL};
 use super::tile::{Tile, TileData, TILE_SIZE};
-use super::color::{Pixel, ZERO_PIXEL, Color};
 use super::Layer;
 
 #[derive(Clone)]

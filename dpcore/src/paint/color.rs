@@ -1,4 +1,4 @@
-pub type Pixel = [u8;4];
+pub type Pixel = [u8; 4];
 
 pub const ALPHA_CHANNEL: usize = 0;
 pub const RED_CHANNEL: usize = 1;

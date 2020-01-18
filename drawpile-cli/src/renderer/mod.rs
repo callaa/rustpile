@@ -1,6 +1,6 @@
 use dpcore::canvas::CanvasState;
-use dpcore::protocol::{open_recording, Compatibility, ReadMessage};
 use dpcore::paint::color::*;
+use dpcore::protocol::{open_recording, Compatibility, ReadMessage};
 
 use tracing::{info, warn};
 
