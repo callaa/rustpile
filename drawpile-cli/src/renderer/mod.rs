@@ -1,6 +1,6 @@
 use dpcore::canvas::CanvasState;
 use dpcore::paint::color::*;
-use dpcore::protocol::{open_recording, Compatibility, ReadMessage};
+use dpcore::protocol::{open_recording, Compatibility, Message, ReadMessage};
 
 use tracing::{info, warn};
 
@@ -49,7 +49,10 @@ pub fn render_recording(opts: &RenderOpts) -> Result<(), Box<dyn std::error::Err
         match reader.read_next() {
             ReadMessage::Ok(m) => {
                 let now = Instant::now();
-                canvas.receive_message(&m);
+                match &m {
+                    Message::Command(c) => canvas.receive_message(c),
+                    _ => (),
+                }
                 total_render_time += now.elapsed();
             }
             ReadMessage::Invalid(msg) => {

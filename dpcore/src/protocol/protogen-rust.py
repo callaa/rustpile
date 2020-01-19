@@ -2,7 +2,7 @@
 
 from jinja2 import Template
 
-from protogen import load_protocol_definition
+from protogen import load_protocol_definition, MSG_TYPES
 
 template = Template("""
 // Message definitions generated with protogen-rust.py
@@ -150,29 +150,90 @@ impl {{ message.name }}Message {
 
 {% endif %}{% endfor %}{# messages with more than one field #}
 
+{% for message_type in message_types %}
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Body {
-    {% for message in messages %}
+pub enum {{ message_type }}Message {
+    {% for message in messages %}{% if message.message_type == message_type %}
     {{ comment(message.comment) }}
     {% if message.alias %}
-    {{ message.name }}({{ message.alias }}Message),
+    {{ message.name }}(u8, {{ message.alias }}Message),
     {% elif message.fields|length > 1 %}
-    {{ message.name }}({{ message.name }}Message),
+    {{ message.name }}(u8, {{ message.name }}Message),
     {% elif message.fields %}
-    {{ message.name }}({{ field_rust_type(message.fields[0]) }}),
+    {{ message.name }}(u8, {{ field_rust_type(message.fields[0]) }}),
     {% else %}
-    {{ message.name }},
+    {{ message.name }}(u8),
     {% endif %}
 
-    {% endfor %}{# messages #}
+    {% endif %}{% endfor %}{# messages #}
 }
+{% endfor %}{# normal_message_types #}
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Message {
-    pub user_id: u8,
-    pub body: Body
+pub enum Message {
+    {% for mt in message_types %}{{ mt }}({{ mt }}Message),{% endfor %}
 }
+
+{% for message_type in message_types %}
+impl {{ message_type }}Message {
+    pub fn serialize(&self) -> Vec<u8> {
+        use {{ message_type }}Message::*;
+        match &self {
+            {% for message in messages %}{% if message.message_type == message_type %}
+            {% if message.alias or message.fields|length > 1 %}
+            {{ message.name }}(user_id, b) => b.serialize(*user_id),
+            {% elif message.fields %}
+            {{ message.name }}(user_id, b) => MessageWriter::single({{ message.id }}, *user_id, {{ deref_primitive(message.fields[0]) }}b),
+            {% else %}
+            {{ message.name }}(user_id) => MessageWriter::with_expected_payload({{ message.id }}, *user_id, 0).into(),
+            {% endif %}
+            {% endif %}{% endfor %}{# message in messages #}
+        }
+    }
+
+    pub fn as_text(&self) -> TextMessage {
+        use {{ message_type }}Message::*;
+        match &self {
+            {% for message in messages %}{% if message.message_type == message_type %}
+            {% if message.alias or message.fields|length > 1%}
+            {{ message.name }}(user_id, b) => b.to_text(TextMessage::new(*user_id, "{{ message.cmd_name }}")),
+            {% elif message.fields %}
+            {{ message.name }}(user_id, b) => TextMessage::new(*user_id, "{{ message.cmd_name }}").{{ textmessage_setfield(message.fields[0], 'b') }},
+            {% else %}
+            {{ message.name }}(user_id) => TextMessage::new(*user_id, "{{ message.cmd_name }}"),
+            {% endif %}
+            {% endif %}{% endfor %}{# message in messages #}
+        }
+    }
+
+    pub fn user(&self) -> u8 {
+        use {{ message_type }}Message::*;
+        match &self {
+            {% for message in messages %}{% if message.message_type == message_type %}
+            {% if message.alias or message.fields %}
+            {{ message.name }}(user_id, _) => *user_id,
+            {% else %}
+            {{ message.name }}(user_id) => *user_id,
+            {% endif %}
+            {% endif %}{% endfor %}{# message in messages #}
+        }
+    }
+}
+
+impl fmt::Display for {{ message_type }}Message {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_text().fmt(f)
+    }
+}
+
+impl From<{{ message_type }}Message> for Message {
+    fn from(item: {{ message_type}}Message) -> Message {
+        Message::{{ message_type }}(item)
+    }
+}
+
+{% endfor %}{# message_type #}
 
 impl Message {
     pub fn deserialize(buf: &[u8]) -> Result<Message, DeserializationError> {
@@ -199,84 +260,59 @@ impl Message {
 
         let buf = &buf[4..];
 
-        use Body::*;
-        Ok(Message {
-            user_id,
-            body: match message_type {
-                {% for message in messages %}
-                {{ message.id }} =>
+        use Message::*;
+        Ok(match message_type {
+            {% for message in messages %}
+            {{ message.id }} => {{ message.message_type }}({{ message.message_type }}Message::{{ message.name }}(user_id,
                 {% if message.alias %}
-                {{ message.name }}({{ message.alias }}Message::deserialize(&buf)?),
+                    {{ message.alias }}Message::deserialize(&buf)?
                 {% elif message.fields|length > 1 %}
-                {{ message.name }}({{ message.name }}Message::deserialize(&buf)?),
+                    {{ message.name }}Message::deserialize(&buf)?
                 {% elif message.fields %}
-                {{ message.name }}(MessageReader::new(&buf)
-                    {%+ if message.min_len > 0 or message.max_len < 65535 %}.check_len({{ message.min_len }}, {{ message.max_len }}, {{ message.id }}, 0)?{% endif -%}
-                    .{{ read_field(message.fields[0].field_type) }}
-                ),
-                {% else %}
-                {{ message.name }},
-                {% endif %}
-                {% endfor %}{# message in messages #}
-                _ => {
-                    return Err(DeserializationError {
-                        user_id,
-                        message_type,
-                        payload_len,
-                        error: "Unknown message type",
-                    });
-                }
+                    MessageReader::new(&buf)
+                        {%+ if message.min_len > 0 or message.max_len < 65535 %}.check_len({{ message.min_len }}, {{ message.max_len }}, {{ message.id }}, 0)?{% endif -%}
+                        .{{ read_field(message.fields[0].field_type) }}
+                {% endif %})),
+            {% endfor %}{# message in messages #}
+            _ => {
+                return Err(DeserializationError {
+                    user_id,
+                    message_type,
+                    payload_len,
+                    error: "Unknown message type",
+                });
             }
         })
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        use Body::*;
-        match &self.body {
-            {% for message in messages %}
-            {% if message.alias or message.fields|length > 1 %}
-            {{ message.name }}(b) => b.serialize(self.user_id),
-            {% elif message.fields %}
-            {{ message.name }}(b) => MessageWriter::single({{ message.id }}, self.user_id, {{ deref_primitive(message.fields[0]) }}b),
-            {% else %}
-            {{ message.name }} => MessageWriter::with_expected_payload({{ message.id }}, self.user_id, 0).into(),
-            {% endif %}
-            {% endfor %}{# message in messages #}
+        use Message::*;
+        match &self {
+            {% for mt in message_types %}{{ mt }}(m) => m.serialize(),{% endfor %}
         }
+    }
+
+    pub fn from_text(tm: &TextMessage) -> Option<Message> {
+        // tm.user_id
+        use Message::*;
+        Some(match tm.name.as_ref() {
+            {% for message in messages %}
+            "{{ message.cmd_name }}" => {{ message.message_type }}({{ message.message_type }}Message::{{ message.name }}(tm.user_id,
+            {% if message.alias or message.fields|length > 1%}
+                {{ message.alias or message.name }}Message::from_text(&tm)
+            {% elif message.fields %}
+                {{ textmessage_getfield('tm', message.fields[0]) }}
+            {% endif %})),
+            {% endfor %}{# message in messages #}
+            _ => { return None; }
+        })
     }
 
     pub fn as_text(&self) -> TextMessage {
-        use Body::*;
-        match &self.body {
-            {% for message in messages %}
-            {% if message.alias or message.fields|length > 1%}
-            {{ message.name }}(b) => b.to_text(TextMessage::new(self.user_id, "{{ message.cmd_name }}")),
-            {% elif message.fields %}
-            {{ message.name }}(b) => TextMessage::new(self.user_id, "{{ message.cmd_name }}").{{ textmessage_setfield(message.fields[0], 'b') }},
-            {% else %}
-            {{ message.name }} => TextMessage::new(self.user_id, "{{ message.cmd_name }}"),
-            {% endif %}
-            {% endfor %}{# message in messages #}
+        use Message::*;
+        match &self {
+            {% for mt in message_types %}{{ mt }}(m) => m.as_text(),{% endfor %}
         }
-    }
-
-    pub fn from_text(tm: &TextMessage) -> Option<Self> {
-        use Body::*;
-        Some(Self{
-            user_id: tm.user_id,
-            body: match tm.name.as_ref() {
-                {% for message in messages %}
-                {% if message.alias or message.fields|length > 1%}
-                "{{ message.cmd_name }}" => {{ message.name }}({{ message.alias or message.name }}Message::from_text(&tm)),
-                {% elif message.fields %}
-                "{{ message.cmd_name }}" => {{ message.name }}({{ textmessage_getfield('tm', message.fields[0]) }}),
-                {% else %}
-                "{{ message.cmd_name }}" => {{ message.name }},
-                {% endif %}
-                {% endfor %}{# message in messages #}
-                _ => { return None; }
-            }
-        })
     }
 }
 
@@ -422,6 +458,7 @@ if __name__ == '__main__':
 
     print(template.render(
         messages=[m for m in protocol['messages'] if not m.reserved],
+        message_types=MSG_TYPES,
         version=protocol['version'],
         undo_depth=protocol['undo_depth'],
         field_rust_type=field_rust_type,

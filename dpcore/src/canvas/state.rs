@@ -28,42 +28,29 @@ impl CanvasState {
     pub fn layerstack(&self) -> &LayerStack {
         &self.layerstack
     }
-    pub fn receive_message(&mut self, msg: &Message) {
+    pub fn receive_message(&mut self, msg: &CommandMessage) {
         self.history.add(msg.clone());
         self.handle_message(msg);
     }
 
-    fn handle_message(&mut self, msg: &Message) {
-        use Body::*;
-        match &msg.body {
-            DrawDabsClassic(m) => self.handle_drawdabs_classic(msg.user_id, m),
-            DrawDabsPixel(m) => self.handle_drawdabs_pixel(msg.user_id, m, false),
-            DrawDabsPixelSquare(m) => self.handle_drawdabs_pixel(msg.user_id, m, true),
+    fn handle_message(&mut self, msg: &CommandMessage) {
+        use CommandMessage::*;
+        match &msg {
+            DrawDabsClassic(user, m) => self.handle_drawdabs_classic(*user, m),
+            DrawDabsPixel(user, m) => self.handle_drawdabs_pixel(*user, m, false),
+            DrawDabsPixelSquare(user, m) => self.handle_drawdabs_pixel(*user, m, true),
 
-            UndoPoint => self.handle_undopoint(msg.user_id),
-            PenUp => self.handle_penup(msg.user_id),
-            Undo(m) => self.handle_undo(msg.user_id, m),
+            UndoPoint(user) => self.handle_undopoint(*user),
+            PenUp(user) => self.handle_penup(*user),
+            Undo(user, m) => self.handle_undo(*user, m),
 
-            CanvasResize(m) => self.handle_canvas_resize(m),
-            LayerCreate(m) => self.handle_layer_create(m),
-            LayerAttributes(m) => self.handle_layer_attributes(m),
-            PutTile(m) => self.handle_puttile(msg.user_id, m),
-            CanvasBackground(m) => self.handle_background(m),
-            FillRect(m) => self.handle_fillrect(msg.user_id, m),
+            CanvasResize(_, m) => self.handle_canvas_resize(m),
+            LayerCreate(_, m) => self.handle_layer_create(m),
+            LayerAttributes(_, m) => self.handle_layer_attributes(m),
+            PutTile(user, m) => self.handle_puttile(*user, m),
+            CanvasBackground(_, m) => self.handle_background(m),
+            FillRect(user, m) => self.handle_fillrect(*user, m),
 
-            Join(_)
-            | SessionOwner(_)
-            | Chat(_)
-            | TrustedUsers(_)
-            | PrivateChat(_)
-            | Interval(_)
-            | LaserTrail(_)
-            | MovePointer(_)
-            | Marker(_)
-            | UserACL(_)
-            | LayerACL(_)
-            | FeatureAccessLevels(_)
-            | Filtered(_) => (), // These messages have no effect on rendering
             _ => todo!("Unhandled message: {}", msg),
         }
     }

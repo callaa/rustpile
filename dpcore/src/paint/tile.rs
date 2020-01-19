@@ -83,7 +83,7 @@ impl Tile {
                 } else {
                     None
                 }
-            },
+            }
             Tile::Blank => Some(Color::TRANSPARENT),
         }
     }

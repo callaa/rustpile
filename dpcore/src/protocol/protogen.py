@@ -7,7 +7,12 @@ MSG_TYPE_CTRL = "Control"
 MSG_TYPE_SRV_META = "ServerMeta"
 MSG_TYPE_CLIENT_META = "ClientMeta"
 MSG_TYPE_CMD = "Command"
-
+MSG_TYPES = (
+    MSG_TYPE_CTRL,
+    MSG_TYPE_SRV_META,
+    MSG_TYPE_CLIENT_META,
+    MSG_TYPE_CMD,
+)
 
 class BadDefinition(Exception):
     pass

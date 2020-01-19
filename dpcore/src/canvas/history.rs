@@ -1,10 +1,10 @@
 use crate::paint::{LayerStack, UserID};
-use crate::protocol::message::{Body, Message, UNDO_DEPTH};
+use crate::protocol::message::{CommandMessage, UNDO_DEPTH};
 
 use std::rc::Rc;
 
 struct HistoryEntry {
-    msg: Message,
+    msg: CommandMessage,
     state: UndoState,
     seq_num: u32,
 }
@@ -36,16 +36,16 @@ impl History {
         }
     }
 
-    pub fn add(&mut self, msg: Message) {
+    pub fn add(&mut self, msg: CommandMessage) {
         // Undo messages cannot be undone/redone so no point in
         // storing them in the history.
         let mut branch = false;
         let mut branch_user: UserID = 0;
-        match msg.body {
-            Body::Undo(_) => return,
-            Body::UndoPoint => {
+        match msg {
+            CommandMessage::Undo(_, _) => return,
+            CommandMessage::UndoPoint(user_id) => {
                 branch = true;
-                branch_user = msg.user_id;
+                branch_user = user_id;
             }
             _ => (),
         }
@@ -63,7 +63,7 @@ impl History {
             // All undo sequences in the old branch (i.e. all undone actions by this user) become inaccessible.
             self.history
                 .iter_mut()
-                .filter(|e| e.state == UndoState::Undone && e.msg.user_id == branch_user)
+                .filter(|e| e.state == UndoState::Undone && e.msg.user() == branch_user)
                 .for_each(|e| e.state = UndoState::Gone);
 
             // We can drop savepoints older than the oldest undopoint,
@@ -97,13 +97,16 @@ impl History {
         let mut ups = 0;
         let mut oldest: Option<u32> = None;
         for entry in self.history.iter().rev() {
-            if entry.msg.body == Body::UndoPoint {
-                ups += 1;
-                oldest = Some(entry.seq_num);
+            match entry.msg {
+                CommandMessage::UndoPoint(_) => {
+                    ups += 1;
+                    oldest = Some(entry.seq_num);
 
-                if ups >= UNDO_DEPTH {
-                    break;
+                    if ups >= UNDO_DEPTH {
+                        break;
+                    }
                 }
+                _ => (),
             }
         }
 
@@ -113,7 +116,7 @@ impl History {
     /// Undo the given user's last undoable sequence.
     /// The messages are marked as undone and a snapshot of the canvas at some point prior to the undone sequence + messages that must
     /// be replayed are returned.
-    pub fn undo(&mut self, user: UserID) -> Option<(Rc<LayerStack>, Vec<Message>)> {
+    pub fn undo(&mut self, user: UserID) -> Option<(Rc<LayerStack>, Vec<CommandMessage>)> {
         // Step 1. Find the first not-undone UndoPoint belonging to this user,
         // starting from the end of the history.
         let oldest_up = self.oldest_undopoint_seqnum()?;
@@ -123,9 +126,7 @@ impl History {
             .iter()
             .rev()
             .take_while(|e| e.seq_num >= oldest_up)
-            .find(|e| {
-                e.msg.user_id == user && e.msg.body == Body::UndoPoint && e.state == UndoState::Done
-            })?
+            .find(|e| is_undopoint(&e.msg, user) && e.state == UndoState::Done)?
             .seq_num;
 
         // Step 2. Find the savepoint closest to (but preceding) this undopoint
@@ -138,7 +139,7 @@ impl History {
         self.history
             .iter_mut()
             .rev()
-            .filter(|e| e.msg.user_id == user && e.state == UndoState::Done)
+            .filter(|e| e.msg.user() == user && e.state == UndoState::Done)
             .take_while(|e| e.seq_num >= first_undopoint_seqnum)
             .for_each(|e| e.state = UndoState::Undone);
 
@@ -162,7 +163,7 @@ impl History {
     /// Undo the given user's last undoable sequence.
     /// The messages are marked as done and a snapshot of the canvas at some point prior to the undone sequence + messages that must
     /// be replayed are returned.
-    pub fn redo(&mut self, user: UserID) -> Option<(Rc<LayerStack>, Vec<Message>)> {
+    pub fn redo(&mut self, user: UserID) -> Option<(Rc<LayerStack>, Vec<CommandMessage>)> {
         // Step 1. Find the oldest undone undopoint
         let oldest_up = self.oldest_undopoint_seqnum()?;
 
@@ -170,11 +171,7 @@ impl History {
             .history
             .iter()
             .skip_while(|e| e.seq_num < oldest_up)
-            .find(|e| {
-                e.msg.user_id == user
-                    && e.msg.body == Body::UndoPoint
-                    && e.state == UndoState::Undone
-            })?
+            .find(|e| is_undopoint(&e.msg, user) && e.state == UndoState::Undone)?
             .seq_num;
 
         // Step 2. Find the savepoint closest to (but preceding) this undopoint
@@ -188,8 +185,8 @@ impl History {
         self.history
             .iter_mut()
             .skip_while(|e| e.seq_num < first_undopoint_seqnum)
-            .filter(|e| e.msg.user_id == user && e.state != UndoState::Gone)
-            .take_while(|e| e.msg.body != Body::UndoPoint || e.seq_num == first_undopoint_seqnum)
+            .filter(|e| e.msg.user() == user && e.state != UndoState::Gone)
+            .take_while(|e| !is_any_undopoint(&e.msg) || e.seq_num == first_undopoint_seqnum)
             .for_each(|e| e.state = UndoState::Done);
 
         // Step 4. Return the savepoint and all messages to be redone
@@ -214,5 +211,20 @@ impl History {
             layerstack,
             seq_num: self.sequence,
         });
+    }
+}
+
+fn is_any_undopoint(msg: &CommandMessage) -> bool {
+    match msg {
+        CommandMessage::UndoPoint(_) => true,
+        _ => false,
+    }
+}
+
+/// Check that the given message is an undopoint with the given user ID
+fn is_undopoint(msg: &CommandMessage, user: u8) -> bool {
+    match msg {
+        CommandMessage::UndoPoint(u) => *u == user,
+        _ => false,
     }
 }

@@ -1358,7 +1358,7 @@ impl UndoMessage {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Body {
+pub enum ControlMessage {
     /// Server command message
     ///
     /// This is a general purpose message for sending commands to the server
@@ -1368,14 +1368,14 @@ pub enum Body {
     /// - setting session parameters (e.g. max user count and password)
     /// - sending administration commands (e.g. kick user)
     ///
-    Command(String),
+    ServerCommand(u8, String),
 
     /// Disconnect notification
     ///
     /// This message is used when closing the connection gracefully. The message queue
     /// will automatically close the socket after sending this message.
     ///
-    Disconnect(DisconnectMessage),
+    Disconnect(u8, DisconnectMessage),
 
     /// Ping message
     ///
@@ -1384,14 +1384,17 @@ pub enum Body {
     ///
     /// The server should return a Ping with the is_pong flag set
     ///
-    Ping(bool),
+    Ping(u8, bool),
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ServerMetaMessage {
     /// Inform the client of a new user
     ///
     /// This message is sent only be the server. It associates a username
     /// with a context ID.
     ///
-    Join(JoinMessage),
+    Join(u8, JoinMessage),
 
     /// Inform the client of a user leaving
     ///
@@ -1399,7 +1402,7 @@ pub enum Body {
     /// clients will typically remove the user from the user listing. The client
     /// is also allowed to release resources associated with this context ID.
     ///
-    Leave,
+    Leave(u8),
 
     /// Session ownership change
     ///
@@ -1413,7 +1416,7 @@ pub enum Body {
     /// it does not contain any duplicates or non-existing users and can be trusted
     /// without checking the access control list.
     ///
-    SessionOwner(Vec<u8>),
+    SessionOwner(u8, Vec<u8>),
 
     /// A chat message
     ///
@@ -1421,7 +1424,7 @@ pub enum Body {
     /// (Typically a Command message is used for server announcements, but the Chat message
     /// is used for those messages that must be stored in the session history.)
     ///
-    Chat(ChatMessage),
+    Chat(u8, ChatMessage),
 
     /// List of trusted users
     ///
@@ -1436,7 +1439,7 @@ pub enum Body {
     /// it does not contain any duplicates or non-existing users and can be trusted
     /// without checking the access control list.
     ///
-    TrustedUsers(Vec<u8>),
+    TrustedUsers(u8, Vec<u8>),
 
     /// Soft reset point marker
     ///
@@ -1446,7 +1449,7 @@ pub enum Body {
     /// All users should truncate their own session history when receiving this message,
     /// since undos cannot cross the reset boundary.
     ///
-    SoftReset,
+    SoftReset(u8),
 
     /// A private chat message
     ///
@@ -1456,8 +1459,11 @@ pub enum Body {
     ///
     /// Private messages always bypass the session history.
     ///
-    PrivateChat(PrivateChatMessage),
+    PrivateChat(u8, PrivateChatMessage),
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ClientMetaMessage {
     /// Event interval record
     ///
     /// This is used to preserve timing information in session recordings.
@@ -1465,7 +1471,7 @@ pub enum Body {
     /// Note. The maximum interval (using a single message) is about 65 seconds.
     /// Typically the intervals we want to store are a few seconds at most, so this should be enough.
     ///
-    Interval(u16),
+    Interval(u8, u16),
 
     /// Start/end drawing pointer laser trail
     ///
@@ -1474,7 +1480,7 @@ pub enum Body {
     ///
     /// A nonzero persistence indicates the start of the trail and zero the end.
     ///
-    LaserTrail(LaserTrailMessage),
+    LaserTrail(u8, LaserTrailMessage),
 
     /// Move user pointer
     ///
@@ -1485,20 +1491,20 @@ pub enum Body {
     ///
     /// The pointer position is given in integer coordinates.
     ///
-    MovePointer(MovePointerMessage),
+    MovePointer(u8, MovePointerMessage),
 
     /// A bookmark
     ///
     /// This is used to bookmark points in the session for quick access when playing back a recording
     ///
-    Marker(String),
+    Marker(u8, String),
 
     /// Set user specific locks
     ///
     /// This is an opaque meta command that contains a list of users to be locked.
     /// It can only be sent by session operators.
     ///
-    UserACL(Vec<u8>),
+    UserACL(u8, Vec<u8>),
 
     /// Change layer access control list
     ///
@@ -1514,30 +1520,33 @@ pub enum Body {
     /// The eighth bit of the flags field (0x80) indicates whether the layer is locked in general.
     /// The first three bits (0x07) indicate the access tier level.
     ///
-    LayerACL(LayerACLMessage),
+    LayerACL(u8, LayerACLMessage),
 
     /// Change feature access tiers
-    FeatureAccessLevels(Vec<u8>),
+    FeatureAccessLevels(u8, Vec<u8>),
 
     /// Set the default layer
     ///
     /// The default layer is the one new users default to when logging in.
     /// If no default layer is set, the newest layer will be selected by default.
     ///
-    DefaultLayer(u16),
+    DefaultLayer(u8, u16),
 
     /// A message that has been filtered away by the ACL filter
     ///
     /// This is only used in recordings for mainly debugging purposes.
     /// This message should never be sent over the network.
     ///
-    Filtered(Vec<u8>),
+    Filtered(u8, Vec<u8>),
+}
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum CommandMessage {
     /// Undo demarcation point
     ///
     /// The client sends an UndoPoint message to signal the start of an undoable sequence.
     ///
-    UndoPoint,
+    UndoPoint(u8),
 
     /// Adjust canvas size
     ///
@@ -1549,7 +1558,7 @@ pub enum Body {
     /// parameters extend or retract their respective borders.
     /// Initial canvas resize should be (0, w, h, 0).
     ///
-    CanvasResize(CanvasResizeMessage),
+    CanvasResize(u8, CanvasResizeMessage),
 
     /// Create a new layer
     ///
@@ -1573,7 +1582,7 @@ pub enum Body {
     ///
     /// If layer controls are locked, this command requires session operator privileges.
     ///
-    LayerCreate(LayerCreateMessage),
+    LayerCreate(u8, LayerCreateMessage),
 
     /// Change layer attributes
     ///
@@ -1582,10 +1591,10 @@ pub enum Body {
     /// Specifying a sublayer requires session operator privileges. Currently, it is used
     /// only when sublayers are needed at canvas initialization.
     ///
-    LayerAttributes(LayerAttributesMessage),
+    LayerAttributes(u8, LayerAttributesMessage),
 
     /// Change a layer's title
-    LayerRetitle(LayerRetitleMessage),
+    LayerRetitle(u8, LayerRetitleMessage),
 
     /// Reorder layers
     ///
@@ -1602,7 +1611,7 @@ pub enum Body {
     ///
     /// If layer controls are locked, this command requires session operator privileges.
     ///
-    LayerOrder(Vec<u16>),
+    LayerOrder(u8, Vec<u16>),
 
     /// Delete a layer
     ///
@@ -1612,7 +1621,7 @@ pub enum Body {
     /// If the current layer or layer controls in general are locked, this command
     /// requires session operator privileges.
     ///
-    LayerDelete(LayerDeleteMessage),
+    LayerDelete(u8, LayerDeleteMessage),
 
     /// Change layer visibility
     ///
@@ -1625,7 +1634,7 @@ pub enum Body {
     /// Note: to hide the layer for all users, use LayerAttributes to set its opacity
     /// to zero.
     ///
-    LayerVisibility(LayerVisibilityMessage),
+    LayerVisibility(u8, LayerVisibilityMessage),
 
     /// Draw a bitmap onto a layer
     ///
@@ -1642,17 +1651,17 @@ pub enum Body {
     /// large image may have to be divided into multiple PutImage
     /// commands.
     ///
-    PutImage(PutImageMessage),
+    PutImage(u8, PutImageMessage),
 
     /// Fill a rectangle with solid color
-    FillRect(FillRectMessage),
+    FillRect(u8, FillRectMessage),
 
     /// Pen up command
     ///
     /// The pen up command signals the end of a stroke. In indirect drawing mode, it causes
     /// indirect dabs (by this user) to be merged to their parent layers.
     ///
-    PenUp,
+    PenUp(u8),
 
     /// Create a new annotation
     ///
@@ -1661,10 +1670,10 @@ pub enum Body {
     ///
     /// The new annotation created with this command is initally empy with a transparent background
     ///
-    AnnotationCreate(AnnotationCreateMessage),
+    AnnotationCreate(u8, AnnotationCreateMessage),
 
     /// Change the position and size of an annotation
-    AnnotationReshape(AnnotationReshapeMessage),
+    AnnotationReshape(u8, AnnotationReshapeMessage),
 
     /// Change annotation content
     ///
@@ -1673,7 +1682,7 @@ pub enum Body {
     /// If an annotation is flagged as protected, it cannot be modified by users
     /// other than the one who created it, or session operators.
     ///
-    AnnotationEdit(AnnotationEditMessage),
+    AnnotationEdit(u8, AnnotationEditMessage),
 
     /// Delete an annotation
     ///
@@ -1682,7 +1691,7 @@ pub enum Body {
     /// an image and drawing the image with the PutImage command. This ensures
     /// identical rendering on all clients.
     ///
-    AnnotationDelete(u16),
+    AnnotationDelete(u8, u16),
 
     /// Move (and transform) a region of a layer.
     ///
@@ -1702,7 +1711,7 @@ pub enum Body {
     /// is DEFLATEd 1 bit per pixel bitmap data.
     /// For axis aligned rectangle selections, no bitmap is necessary.
     ///
-    MoveRegion(MoveRegionMessage),
+    MoveRegion(u8, MoveRegionMessage),
 
     /// Set the content of a tile
     ///
@@ -1712,14 +1721,14 @@ pub enum Body {
     /// PutTile can target sublayers as well. This is used when generating a reset image
     /// with incomplete indirect strokes. Sending a PenUp command will merge the sublayer.
     ///
-    PutTile(PutTileMessage),
+    PutTile(u8, PutTileMessage),
 
     /// Set the canvas background tile
     ///
     /// If the payload is exactly 4 bytes long, it should be interpreted as a solid background color.
     /// Otherwise, it is the DEFLATED tile bitmap
     ///
-    CanvasBackground(Vec<u8>),
+    CanvasBackground(u8, Vec<u8>),
 
     /// Draw classic brush dabs
     ///
@@ -1728,26 +1737,301 @@ pub enum Body {
     /// The coordinate system has 1/4 pixel resolution. Divide by 4.0 before use.
     /// The size field is the brush diameter multiplied by 256.
     ///
-    DrawDabsClassic(DrawDabsClassicMessage),
+    DrawDabsClassic(u8, DrawDabsClassicMessage),
 
     /// Draw round pixel brush dabs
     ///
     /// The same kind of delta compression is used as in classicdabs,
     /// but the fields all have integer precision.
     ///
-    DrawDabsPixel(DrawDabsPixelMessage),
+    DrawDabsPixel(u8, DrawDabsPixelMessage),
 
     /// Draw square pixel brush dabs
-    DrawDabsPixelSquare(DrawDabsPixelMessage),
+    DrawDabsPixelSquare(u8, DrawDabsPixelMessage),
 
     /// Undo or redo actions
-    Undo(UndoMessage),
+    Undo(u8, UndoMessage),
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Message {
-    pub user_id: u8,
-    pub body: Body,
+pub enum Message {
+    Control(ControlMessage),
+    ServerMeta(ServerMetaMessage),
+    ClientMeta(ClientMetaMessage),
+    Command(CommandMessage),
+}
+
+impl ControlMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        use ControlMessage::*;
+        match &self {
+            ServerCommand(user_id, b) => MessageWriter::single(0, *user_id, b),
+            Disconnect(user_id, b) => b.serialize(*user_id),
+            Ping(user_id, b) => MessageWriter::single(2, *user_id, *b),
+        }
+    }
+
+    pub fn as_text(&self) -> TextMessage {
+        use ControlMessage::*;
+        match &self {
+            ServerCommand(user_id, b) => {
+                TextMessage::new(*user_id, "servercommand").set("msg", b.clone())
+            }
+            Disconnect(user_id, b) => b.to_text(TextMessage::new(*user_id, "disconnect")),
+            Ping(user_id, b) => TextMessage::new(*user_id, "ping").set("is_pong", b.to_string()),
+        }
+    }
+
+    pub fn user(&self) -> u8 {
+        use ControlMessage::*;
+        match &self {
+            ServerCommand(user_id, _) => *user_id,
+            Disconnect(user_id, _) => *user_id,
+            Ping(user_id, _) => *user_id,
+        }
+    }
+}
+
+impl fmt::Display for ControlMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_text().fmt(f)
+    }
+}
+
+impl From<ControlMessage> for Message {
+    fn from(item: ControlMessage) -> Message {
+        Message::Control(item)
+    }
+}
+
+impl ServerMetaMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        use ServerMetaMessage::*;
+        match &self {
+            Join(user_id, b) => b.serialize(*user_id),
+            Leave(user_id) => MessageWriter::with_expected_payload(33, *user_id, 0).into(),
+            SessionOwner(user_id, b) => MessageWriter::single(34, *user_id, b),
+            Chat(user_id, b) => b.serialize(*user_id),
+            TrustedUsers(user_id, b) => MessageWriter::single(36, *user_id, b),
+            SoftReset(user_id) => MessageWriter::with_expected_payload(37, *user_id, 0).into(),
+            PrivateChat(user_id, b) => b.serialize(*user_id),
+        }
+    }
+
+    pub fn as_text(&self) -> TextMessage {
+        use ServerMetaMessage::*;
+        match &self {
+            Join(user_id, b) => b.to_text(TextMessage::new(*user_id, "join")),
+            Leave(user_id) => TextMessage::new(*user_id, "leave"),
+            SessionOwner(user_id, b) => {
+                TextMessage::new(*user_id, "sessionowner").set_vec_u8("users", &b)
+            }
+            Chat(user_id, b) => b.to_text(TextMessage::new(*user_id, "chat")),
+            TrustedUsers(user_id, b) => {
+                TextMessage::new(*user_id, "trusted").set_vec_u8("users", &b)
+            }
+            SoftReset(user_id) => TextMessage::new(*user_id, "softreset"),
+            PrivateChat(user_id, b) => b.to_text(TextMessage::new(*user_id, "privatechat")),
+        }
+    }
+
+    pub fn user(&self) -> u8 {
+        use ServerMetaMessage::*;
+        match &self {
+            Join(user_id, _) => *user_id,
+            Leave(user_id) => *user_id,
+            SessionOwner(user_id, _) => *user_id,
+            Chat(user_id, _) => *user_id,
+            TrustedUsers(user_id, _) => *user_id,
+            SoftReset(user_id) => *user_id,
+            PrivateChat(user_id, _) => *user_id,
+        }
+    }
+}
+
+impl fmt::Display for ServerMetaMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_text().fmt(f)
+    }
+}
+
+impl From<ServerMetaMessage> for Message {
+    fn from(item: ServerMetaMessage) -> Message {
+        Message::ServerMeta(item)
+    }
+}
+
+impl ClientMetaMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        use ClientMetaMessage::*;
+        match &self {
+            Interval(user_id, b) => MessageWriter::single(64, *user_id, *b),
+            LaserTrail(user_id, b) => b.serialize(*user_id),
+            MovePointer(user_id, b) => b.serialize(*user_id),
+            Marker(user_id, b) => MessageWriter::single(67, *user_id, b),
+            UserACL(user_id, b) => MessageWriter::single(68, *user_id, b),
+            LayerACL(user_id, b) => b.serialize(*user_id),
+            FeatureAccessLevels(user_id, b) => MessageWriter::single(70, *user_id, b),
+            DefaultLayer(user_id, b) => MessageWriter::single(71, *user_id, *b),
+            Filtered(user_id, b) => MessageWriter::single(72, *user_id, b),
+        }
+    }
+
+    pub fn as_text(&self) -> TextMessage {
+        use ClientMetaMessage::*;
+        match &self {
+            Interval(user_id, b) => {
+                TextMessage::new(*user_id, "interval").set("msecs", b.to_string())
+            }
+            LaserTrail(user_id, b) => b.to_text(TextMessage::new(*user_id, "lasertrail")),
+            MovePointer(user_id, b) => b.to_text(TextMessage::new(*user_id, "movepointer")),
+            Marker(user_id, b) => TextMessage::new(*user_id, "marker").set("text", b.clone()),
+            UserACL(user_id, b) => TextMessage::new(*user_id, "useracl").set_vec_u8("users", &b),
+            LayerACL(user_id, b) => b.to_text(TextMessage::new(*user_id, "layeracl")),
+            FeatureAccessLevels(user_id, b) => {
+                TextMessage::new(*user_id, "featureaccess").set_vec_u8("feature_tiers", &b)
+            }
+            DefaultLayer(user_id, b) => {
+                TextMessage::new(*user_id, "defaultlayer").set("id", format!("0x{:04x}", b))
+            }
+            Filtered(user_id, b) => TextMessage::new(*user_id, "filtered").set_bytes("message", &b),
+        }
+    }
+
+    pub fn user(&self) -> u8 {
+        use ClientMetaMessage::*;
+        match &self {
+            Interval(user_id, _) => *user_id,
+            LaserTrail(user_id, _) => *user_id,
+            MovePointer(user_id, _) => *user_id,
+            Marker(user_id, _) => *user_id,
+            UserACL(user_id, _) => *user_id,
+            LayerACL(user_id, _) => *user_id,
+            FeatureAccessLevels(user_id, _) => *user_id,
+            DefaultLayer(user_id, _) => *user_id,
+            Filtered(user_id, _) => *user_id,
+        }
+    }
+}
+
+impl fmt::Display for ClientMetaMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_text().fmt(f)
+    }
+}
+
+impl From<ClientMetaMessage> for Message {
+    fn from(item: ClientMetaMessage) -> Message {
+        Message::ClientMeta(item)
+    }
+}
+
+impl CommandMessage {
+    pub fn serialize(&self) -> Vec<u8> {
+        use CommandMessage::*;
+        match &self {
+            UndoPoint(user_id) => MessageWriter::with_expected_payload(128, *user_id, 0).into(),
+            CanvasResize(user_id, b) => b.serialize(*user_id),
+            LayerCreate(user_id, b) => b.serialize(*user_id),
+            LayerAttributes(user_id, b) => b.serialize(*user_id),
+            LayerRetitle(user_id, b) => b.serialize(*user_id),
+            LayerOrder(user_id, b) => MessageWriter::single(133, *user_id, b),
+            LayerDelete(user_id, b) => b.serialize(*user_id),
+            LayerVisibility(user_id, b) => b.serialize(*user_id),
+            PutImage(user_id, b) => b.serialize(*user_id),
+            FillRect(user_id, b) => b.serialize(*user_id),
+            PenUp(user_id) => MessageWriter::with_expected_payload(140, *user_id, 0).into(),
+            AnnotationCreate(user_id, b) => b.serialize(*user_id),
+            AnnotationReshape(user_id, b) => b.serialize(*user_id),
+            AnnotationEdit(user_id, b) => b.serialize(*user_id),
+            AnnotationDelete(user_id, b) => MessageWriter::single(144, *user_id, *b),
+            MoveRegion(user_id, b) => b.serialize(*user_id),
+            PutTile(user_id, b) => b.serialize(*user_id),
+            CanvasBackground(user_id, b) => MessageWriter::single(147, *user_id, b),
+            DrawDabsClassic(user_id, b) => b.serialize(*user_id),
+            DrawDabsPixel(user_id, b) => b.serialize(*user_id),
+            DrawDabsPixelSquare(user_id, b) => b.serialize(*user_id),
+            Undo(user_id, b) => b.serialize(*user_id),
+        }
+    }
+
+    pub fn as_text(&self) -> TextMessage {
+        use CommandMessage::*;
+        match &self {
+            UndoPoint(user_id) => TextMessage::new(*user_id, "undopoint"),
+            CanvasResize(user_id, b) => b.to_text(TextMessage::new(*user_id, "resize")),
+            LayerCreate(user_id, b) => b.to_text(TextMessage::new(*user_id, "newlayer")),
+            LayerAttributes(user_id, b) => b.to_text(TextMessage::new(*user_id, "layerattr")),
+            LayerRetitle(user_id, b) => b.to_text(TextMessage::new(*user_id, "retitlelayer")),
+            LayerOrder(user_id, b) => {
+                TextMessage::new(*user_id, "layerorder").set_vec_u16("layers", &b, true)
+            }
+            LayerDelete(user_id, b) => b.to_text(TextMessage::new(*user_id, "deletelayer")),
+            LayerVisibility(user_id, b) => b.to_text(TextMessage::new(*user_id, "layervisibility")),
+            PutImage(user_id, b) => b.to_text(TextMessage::new(*user_id, "putimage")),
+            FillRect(user_id, b) => b.to_text(TextMessage::new(*user_id, "fillrect")),
+            PenUp(user_id) => TextMessage::new(*user_id, "penup"),
+            AnnotationCreate(user_id, b) => b.to_text(TextMessage::new(*user_id, "newannotation")),
+            AnnotationReshape(user_id, b) => {
+                b.to_text(TextMessage::new(*user_id, "reshapeannotation"))
+            }
+            AnnotationEdit(user_id, b) => b.to_text(TextMessage::new(*user_id, "editannotation")),
+            AnnotationDelete(user_id, b) => {
+                TextMessage::new(*user_id, "deleteannotation").set("id", format!("0x{:04x}", b))
+            }
+            MoveRegion(user_id, b) => b.to_text(TextMessage::new(*user_id, "moveregion")),
+            PutTile(user_id, b) => b.to_text(TextMessage::new(*user_id, "puttile")),
+            CanvasBackground(user_id, b) => {
+                TextMessage::new(*user_id, "background").set_bytes("image", &b)
+            }
+            DrawDabsClassic(user_id, b) => b.to_text(TextMessage::new(*user_id, "classicdabs")),
+            DrawDabsPixel(user_id, b) => b.to_text(TextMessage::new(*user_id, "pixeldabs")),
+            DrawDabsPixelSquare(user_id, b) => {
+                b.to_text(TextMessage::new(*user_id, "squarepixeldabs"))
+            }
+            Undo(user_id, b) => b.to_text(TextMessage::new(*user_id, "undo")),
+        }
+    }
+
+    pub fn user(&self) -> u8 {
+        use CommandMessage::*;
+        match &self {
+            UndoPoint(user_id) => *user_id,
+            CanvasResize(user_id, _) => *user_id,
+            LayerCreate(user_id, _) => *user_id,
+            LayerAttributes(user_id, _) => *user_id,
+            LayerRetitle(user_id, _) => *user_id,
+            LayerOrder(user_id, _) => *user_id,
+            LayerDelete(user_id, _) => *user_id,
+            LayerVisibility(user_id, _) => *user_id,
+            PutImage(user_id, _) => *user_id,
+            FillRect(user_id, _) => *user_id,
+            PenUp(user_id) => *user_id,
+            AnnotationCreate(user_id, _) => *user_id,
+            AnnotationReshape(user_id, _) => *user_id,
+            AnnotationEdit(user_id, _) => *user_id,
+            AnnotationDelete(user_id, _) => *user_id,
+            MoveRegion(user_id, _) => *user_id,
+            PutTile(user_id, _) => *user_id,
+            CanvasBackground(user_id, _) => *user_id,
+            DrawDabsClassic(user_id, _) => *user_id,
+            DrawDabsPixel(user_id, _) => *user_id,
+            DrawDabsPixelSquare(user_id, _) => *user_id,
+            Undo(user_id, _) => *user_id,
+        }
+    }
+}
+
+impl fmt::Display for CommandMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_text().fmt(f)
+    }
+}
+
+impl From<CommandMessage> for Message {
+    fn from(item: CommandMessage) -> Message {
+        Message::Command(item)
+    }
 }
 
 impl Message {
@@ -1775,252 +2059,364 @@ impl Message {
 
         let buf = &buf[4..];
 
-        use Body::*;
-        Ok(Message {
-            user_id,
-            body: match message_type {
-                0 => Command(MessageReader::new(&buf).read_remaining_str()),
-                1 => Disconnect(DisconnectMessage::deserialize(&buf)?),
-                2 => Ping(
-                    MessageReader::new(&buf)
-                        .check_len(1, 1, 2, 0)?
-                        .read::<bool>(),
-                ),
-                32 => Join(JoinMessage::deserialize(&buf)?),
-                33 => Leave,
-                34 => SessionOwner(
-                    MessageReader::new(&buf)
-                        .check_len(0, 255, 34, 0)?
-                        .read_remaining_vec(),
-                ),
-                35 => Chat(ChatMessage::deserialize(&buf)?),
-                36 => TrustedUsers(
-                    MessageReader::new(&buf)
-                        .check_len(0, 255, 36, 0)?
-                        .read_remaining_vec(),
-                ),
-                37 => SoftReset,
-                38 => PrivateChat(PrivateChatMessage::deserialize(&buf)?),
-                64 => Interval(
-                    MessageReader::new(&buf)
-                        .check_len(2, 2, 64, 0)?
-                        .read::<u16>(),
-                ),
-                65 => LaserTrail(LaserTrailMessage::deserialize(&buf)?),
-                66 => MovePointer(MovePointerMessage::deserialize(&buf)?),
-                67 => Marker(MessageReader::new(&buf).read_remaining_str()),
-                68 => UserACL(
-                    MessageReader::new(&buf)
-                        .check_len(0, 255, 68, 0)?
-                        .read_remaining_vec(),
-                ),
-                69 => LayerACL(LayerACLMessage::deserialize(&buf)?),
-                70 => FeatureAccessLevels(
-                    MessageReader::new(&buf)
-                        .check_len(9, 9, 70, 0)?
-                        .read_remaining_vec(),
-                ),
-                71 => DefaultLayer(
-                    MessageReader::new(&buf)
-                        .check_len(2, 2, 71, 0)?
-                        .read::<u16>(),
-                ),
-                72 => Filtered(MessageReader::new(&buf).read_remaining_vec::<u8>()),
-                128 => UndoPoint,
-                129 => CanvasResize(CanvasResizeMessage::deserialize(&buf)?),
-                130 => LayerCreate(LayerCreateMessage::deserialize(&buf)?),
-                131 => LayerAttributes(LayerAttributesMessage::deserialize(&buf)?),
-                132 => LayerRetitle(LayerRetitleMessage::deserialize(&buf)?),
-                133 => LayerOrder(MessageReader::new(&buf).read_remaining_vec()),
-                134 => LayerDelete(LayerDeleteMessage::deserialize(&buf)?),
-                135 => LayerVisibility(LayerVisibilityMessage::deserialize(&buf)?),
-                136 => PutImage(PutImageMessage::deserialize(&buf)?),
-                137 => FillRect(FillRectMessage::deserialize(&buf)?),
-                140 => PenUp,
-                141 => AnnotationCreate(AnnotationCreateMessage::deserialize(&buf)?),
-                142 => AnnotationReshape(AnnotationReshapeMessage::deserialize(&buf)?),
-                143 => AnnotationEdit(AnnotationEditMessage::deserialize(&buf)?),
-                144 => AnnotationDelete(
-                    MessageReader::new(&buf)
-                        .check_len(2, 2, 144, 0)?
-                        .read::<u16>(),
-                ),
-                145 => MoveRegion(MoveRegionMessage::deserialize(&buf)?),
-                146 => PutTile(PutTileMessage::deserialize(&buf)?),
-                147 => CanvasBackground(MessageReader::new(&buf).read_remaining_vec::<u8>()),
-                148 => DrawDabsClassic(DrawDabsClassicMessage::deserialize(&buf)?),
-                149 => DrawDabsPixel(DrawDabsPixelMessage::deserialize(&buf)?),
-                150 => DrawDabsPixelSquare(DrawDabsPixelMessage::deserialize(&buf)?),
-                255 => Undo(UndoMessage::deserialize(&buf)?),
-                _ => {
-                    return Err(DeserializationError {
-                        user_id,
-                        message_type,
-                        payload_len,
-                        error: "Unknown message type",
-                    });
-                }
-            },
+        use Message::*;
+        Ok(match message_type {
+            0 => Control(ControlMessage::ServerCommand(
+                user_id,
+                MessageReader::new(&buf).read_remaining_str(),
+            )),
+            1 => Control(ControlMessage::Disconnect(
+                user_id,
+                DisconnectMessage::deserialize(&buf)?,
+            )),
+            2 => Control(ControlMessage::Ping(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(1, 1, 2, 0)?
+                    .read::<bool>(),
+            )),
+            32 => ServerMeta(ServerMetaMessage::Join(
+                user_id,
+                JoinMessage::deserialize(&buf)?,
+            )),
+            33 => ServerMeta(ServerMetaMessage::Leave(user_id)),
+            34 => ServerMeta(ServerMetaMessage::SessionOwner(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(0, 255, 34, 0)?
+                    .read_remaining_vec(),
+            )),
+            35 => ServerMeta(ServerMetaMessage::Chat(
+                user_id,
+                ChatMessage::deserialize(&buf)?,
+            )),
+            36 => ServerMeta(ServerMetaMessage::TrustedUsers(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(0, 255, 36, 0)?
+                    .read_remaining_vec(),
+            )),
+            37 => ServerMeta(ServerMetaMessage::SoftReset(user_id)),
+            38 => ServerMeta(ServerMetaMessage::PrivateChat(
+                user_id,
+                PrivateChatMessage::deserialize(&buf)?,
+            )),
+            64 => ClientMeta(ClientMetaMessage::Interval(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(2, 2, 64, 0)?
+                    .read::<u16>(),
+            )),
+            65 => ClientMeta(ClientMetaMessage::LaserTrail(
+                user_id,
+                LaserTrailMessage::deserialize(&buf)?,
+            )),
+            66 => ClientMeta(ClientMetaMessage::MovePointer(
+                user_id,
+                MovePointerMessage::deserialize(&buf)?,
+            )),
+            67 => ClientMeta(ClientMetaMessage::Marker(
+                user_id,
+                MessageReader::new(&buf).read_remaining_str(),
+            )),
+            68 => ClientMeta(ClientMetaMessage::UserACL(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(0, 255, 68, 0)?
+                    .read_remaining_vec(),
+            )),
+            69 => ClientMeta(ClientMetaMessage::LayerACL(
+                user_id,
+                LayerACLMessage::deserialize(&buf)?,
+            )),
+            70 => ClientMeta(ClientMetaMessage::FeatureAccessLevels(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(9, 9, 70, 0)?
+                    .read_remaining_vec(),
+            )),
+            71 => ClientMeta(ClientMetaMessage::DefaultLayer(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(2, 2, 71, 0)?
+                    .read::<u16>(),
+            )),
+            72 => ClientMeta(ClientMetaMessage::Filtered(
+                user_id,
+                MessageReader::new(&buf).read_remaining_vec::<u8>(),
+            )),
+            128 => Command(CommandMessage::UndoPoint(user_id)),
+            129 => Command(CommandMessage::CanvasResize(
+                user_id,
+                CanvasResizeMessage::deserialize(&buf)?,
+            )),
+            130 => Command(CommandMessage::LayerCreate(
+                user_id,
+                LayerCreateMessage::deserialize(&buf)?,
+            )),
+            131 => Command(CommandMessage::LayerAttributes(
+                user_id,
+                LayerAttributesMessage::deserialize(&buf)?,
+            )),
+            132 => Command(CommandMessage::LayerRetitle(
+                user_id,
+                LayerRetitleMessage::deserialize(&buf)?,
+            )),
+            133 => Command(CommandMessage::LayerOrder(
+                user_id,
+                MessageReader::new(&buf).read_remaining_vec(),
+            )),
+            134 => Command(CommandMessage::LayerDelete(
+                user_id,
+                LayerDeleteMessage::deserialize(&buf)?,
+            )),
+            135 => Command(CommandMessage::LayerVisibility(
+                user_id,
+                LayerVisibilityMessage::deserialize(&buf)?,
+            )),
+            136 => Command(CommandMessage::PutImage(
+                user_id,
+                PutImageMessage::deserialize(&buf)?,
+            )),
+            137 => Command(CommandMessage::FillRect(
+                user_id,
+                FillRectMessage::deserialize(&buf)?,
+            )),
+            140 => Command(CommandMessage::PenUp(user_id)),
+            141 => Command(CommandMessage::AnnotationCreate(
+                user_id,
+                AnnotationCreateMessage::deserialize(&buf)?,
+            )),
+            142 => Command(CommandMessage::AnnotationReshape(
+                user_id,
+                AnnotationReshapeMessage::deserialize(&buf)?,
+            )),
+            143 => Command(CommandMessage::AnnotationEdit(
+                user_id,
+                AnnotationEditMessage::deserialize(&buf)?,
+            )),
+            144 => Command(CommandMessage::AnnotationDelete(
+                user_id,
+                MessageReader::new(&buf)
+                    .check_len(2, 2, 144, 0)?
+                    .read::<u16>(),
+            )),
+            145 => Command(CommandMessage::MoveRegion(
+                user_id,
+                MoveRegionMessage::deserialize(&buf)?,
+            )),
+            146 => Command(CommandMessage::PutTile(
+                user_id,
+                PutTileMessage::deserialize(&buf)?,
+            )),
+            147 => Command(CommandMessage::CanvasBackground(
+                user_id,
+                MessageReader::new(&buf).read_remaining_vec::<u8>(),
+            )),
+            148 => Command(CommandMessage::DrawDabsClassic(
+                user_id,
+                DrawDabsClassicMessage::deserialize(&buf)?,
+            )),
+            149 => Command(CommandMessage::DrawDabsPixel(
+                user_id,
+                DrawDabsPixelMessage::deserialize(&buf)?,
+            )),
+            150 => Command(CommandMessage::DrawDabsPixelSquare(
+                user_id,
+                DrawDabsPixelMessage::deserialize(&buf)?,
+            )),
+            255 => Command(CommandMessage::Undo(
+                user_id,
+                UndoMessage::deserialize(&buf)?,
+            )),
+            _ => {
+                return Err(DeserializationError {
+                    user_id,
+                    message_type,
+                    payload_len,
+                    error: "Unknown message type",
+                });
+            }
         })
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        use Body::*;
-        match &self.body {
-            Command(b) => MessageWriter::single(0, self.user_id, b),
-            Disconnect(b) => b.serialize(self.user_id),
-            Ping(b) => MessageWriter::single(2, self.user_id, *b),
-            Join(b) => b.serialize(self.user_id),
-            Leave => MessageWriter::with_expected_payload(33, self.user_id, 0).into(),
-            SessionOwner(b) => MessageWriter::single(34, self.user_id, b),
-            Chat(b) => b.serialize(self.user_id),
-            TrustedUsers(b) => MessageWriter::single(36, self.user_id, b),
-            SoftReset => MessageWriter::with_expected_payload(37, self.user_id, 0).into(),
-            PrivateChat(b) => b.serialize(self.user_id),
-            Interval(b) => MessageWriter::single(64, self.user_id, *b),
-            LaserTrail(b) => b.serialize(self.user_id),
-            MovePointer(b) => b.serialize(self.user_id),
-            Marker(b) => MessageWriter::single(67, self.user_id, b),
-            UserACL(b) => MessageWriter::single(68, self.user_id, b),
-            LayerACL(b) => b.serialize(self.user_id),
-            FeatureAccessLevels(b) => MessageWriter::single(70, self.user_id, b),
-            DefaultLayer(b) => MessageWriter::single(71, self.user_id, *b),
-            Filtered(b) => MessageWriter::single(72, self.user_id, b),
-            UndoPoint => MessageWriter::with_expected_payload(128, self.user_id, 0).into(),
-            CanvasResize(b) => b.serialize(self.user_id),
-            LayerCreate(b) => b.serialize(self.user_id),
-            LayerAttributes(b) => b.serialize(self.user_id),
-            LayerRetitle(b) => b.serialize(self.user_id),
-            LayerOrder(b) => MessageWriter::single(133, self.user_id, b),
-            LayerDelete(b) => b.serialize(self.user_id),
-            LayerVisibility(b) => b.serialize(self.user_id),
-            PutImage(b) => b.serialize(self.user_id),
-            FillRect(b) => b.serialize(self.user_id),
-            PenUp => MessageWriter::with_expected_payload(140, self.user_id, 0).into(),
-            AnnotationCreate(b) => b.serialize(self.user_id),
-            AnnotationReshape(b) => b.serialize(self.user_id),
-            AnnotationEdit(b) => b.serialize(self.user_id),
-            AnnotationDelete(b) => MessageWriter::single(144, self.user_id, *b),
-            MoveRegion(b) => b.serialize(self.user_id),
-            PutTile(b) => b.serialize(self.user_id),
-            CanvasBackground(b) => MessageWriter::single(147, self.user_id, b),
-            DrawDabsClassic(b) => b.serialize(self.user_id),
-            DrawDabsPixel(b) => b.serialize(self.user_id),
-            DrawDabsPixelSquare(b) => b.serialize(self.user_id),
-            Undo(b) => b.serialize(self.user_id),
+        use Message::*;
+        match &self {
+            Control(m) => m.serialize(),
+            ServerMeta(m) => m.serialize(),
+            ClientMeta(m) => m.serialize(),
+            Command(m) => m.serialize(),
         }
+    }
+
+    pub fn from_text(tm: &TextMessage) -> Option<Message> {
+        // tm.user_id
+        use Message::*;
+        Some(match tm.name.as_ref() {
+            "servercommand" => Control(ControlMessage::ServerCommand(
+                tm.user_id,
+                tm.get_str("msg").to_string(),
+            )),
+            "disconnect" => Control(ControlMessage::Disconnect(
+                tm.user_id,
+                DisconnectMessage::from_text(&tm),
+            )),
+            "ping" => Control(ControlMessage::Ping(
+                tm.user_id,
+                tm.get_str("is_pong") == "true",
+            )),
+            "join" => ServerMeta(ServerMetaMessage::Join(
+                tm.user_id,
+                JoinMessage::from_text(&tm),
+            )),
+            "leave" => ServerMeta(ServerMetaMessage::Leave(tm.user_id)),
+            "sessionowner" => ServerMeta(ServerMetaMessage::SessionOwner(
+                tm.user_id,
+                tm.get_vec_u8("users"),
+            )),
+            "chat" => ServerMeta(ServerMetaMessage::Chat(
+                tm.user_id,
+                ChatMessage::from_text(&tm),
+            )),
+            "trusted" => ServerMeta(ServerMetaMessage::TrustedUsers(
+                tm.user_id,
+                tm.get_vec_u8("users"),
+            )),
+            "softreset" => ServerMeta(ServerMetaMessage::SoftReset(tm.user_id)),
+            "privatechat" => ServerMeta(ServerMetaMessage::PrivateChat(
+                tm.user_id,
+                PrivateChatMessage::from_text(&tm),
+            )),
+            "interval" => ClientMeta(ClientMetaMessage::Interval(tm.user_id, tm.get_u16("msecs"))),
+            "lasertrail" => ClientMeta(ClientMetaMessage::LaserTrail(
+                tm.user_id,
+                LaserTrailMessage::from_text(&tm),
+            )),
+            "movepointer" => ClientMeta(ClientMetaMessage::MovePointer(
+                tm.user_id,
+                MovePointerMessage::from_text(&tm),
+            )),
+            "marker" => ClientMeta(ClientMetaMessage::Marker(
+                tm.user_id,
+                tm.get_str("text").to_string(),
+            )),
+            "useracl" => ClientMeta(ClientMetaMessage::UserACL(
+                tm.user_id,
+                tm.get_vec_u8("users"),
+            )),
+            "layeracl" => ClientMeta(ClientMetaMessage::LayerACL(
+                tm.user_id,
+                LayerACLMessage::from_text(&tm),
+            )),
+            "featureaccess" => ClientMeta(ClientMetaMessage::FeatureAccessLevels(
+                tm.user_id,
+                tm.get_vec_u8("feature_tiers"),
+            )),
+            "defaultlayer" => ClientMeta(ClientMetaMessage::DefaultLayer(
+                tm.user_id,
+                tm.get_u16("id"),
+            )),
+            "filtered" => ClientMeta(ClientMetaMessage::Filtered(
+                tm.user_id,
+                tm.get_bytes("message"),
+            )),
+            "undopoint" => Command(CommandMessage::UndoPoint(tm.user_id)),
+            "resize" => Command(CommandMessage::CanvasResize(
+                tm.user_id,
+                CanvasResizeMessage::from_text(&tm),
+            )),
+            "newlayer" => Command(CommandMessage::LayerCreate(
+                tm.user_id,
+                LayerCreateMessage::from_text(&tm),
+            )),
+            "layerattr" => Command(CommandMessage::LayerAttributes(
+                tm.user_id,
+                LayerAttributesMessage::from_text(&tm),
+            )),
+            "retitlelayer" => Command(CommandMessage::LayerRetitle(
+                tm.user_id,
+                LayerRetitleMessage::from_text(&tm),
+            )),
+            "layerorder" => Command(CommandMessage::LayerOrder(
+                tm.user_id,
+                tm.get_vec_u16("layers"),
+            )),
+            "deletelayer" => Command(CommandMessage::LayerDelete(
+                tm.user_id,
+                LayerDeleteMessage::from_text(&tm),
+            )),
+            "layervisibility" => Command(CommandMessage::LayerVisibility(
+                tm.user_id,
+                LayerVisibilityMessage::from_text(&tm),
+            )),
+            "putimage" => Command(CommandMessage::PutImage(
+                tm.user_id,
+                PutImageMessage::from_text(&tm),
+            )),
+            "fillrect" => Command(CommandMessage::FillRect(
+                tm.user_id,
+                FillRectMessage::from_text(&tm),
+            )),
+            "penup" => Command(CommandMessage::PenUp(tm.user_id)),
+            "newannotation" => Command(CommandMessage::AnnotationCreate(
+                tm.user_id,
+                AnnotationCreateMessage::from_text(&tm),
+            )),
+            "reshapeannotation" => Command(CommandMessage::AnnotationReshape(
+                tm.user_id,
+                AnnotationReshapeMessage::from_text(&tm),
+            )),
+            "editannotation" => Command(CommandMessage::AnnotationEdit(
+                tm.user_id,
+                AnnotationEditMessage::from_text(&tm),
+            )),
+            "deleteannotation" => Command(CommandMessage::AnnotationDelete(
+                tm.user_id,
+                tm.get_u16("id"),
+            )),
+            "moveregion" => Command(CommandMessage::MoveRegion(
+                tm.user_id,
+                MoveRegionMessage::from_text(&tm),
+            )),
+            "puttile" => Command(CommandMessage::PutTile(
+                tm.user_id,
+                PutTileMessage::from_text(&tm),
+            )),
+            "background" => Command(CommandMessage::CanvasBackground(
+                tm.user_id,
+                tm.get_bytes("image"),
+            )),
+            "classicdabs" => Command(CommandMessage::DrawDabsClassic(
+                tm.user_id,
+                DrawDabsClassicMessage::from_text(&tm),
+            )),
+            "pixeldabs" => Command(CommandMessage::DrawDabsPixel(
+                tm.user_id,
+                DrawDabsPixelMessage::from_text(&tm),
+            )),
+            "squarepixeldabs" => Command(CommandMessage::DrawDabsPixelSquare(
+                tm.user_id,
+                DrawDabsPixelMessage::from_text(&tm),
+            )),
+            "undo" => Command(CommandMessage::Undo(
+                tm.user_id,
+                UndoMessage::from_text(&tm),
+            )),
+            _ => {
+                return None;
+            }
+        })
     }
 
     pub fn as_text(&self) -> TextMessage {
-        use Body::*;
-        match &self.body {
-            Command(b) => TextMessage::new(self.user_id, "command").set("msg", b.clone()),
-            Disconnect(b) => b.to_text(TextMessage::new(self.user_id, "disconnect")),
-            Ping(b) => TextMessage::new(self.user_id, "ping").set("is_pong", b.to_string()),
-            Join(b) => b.to_text(TextMessage::new(self.user_id, "join")),
-            Leave => TextMessage::new(self.user_id, "leave"),
-            SessionOwner(b) => {
-                TextMessage::new(self.user_id, "sessionowner").set_vec_u8("users", &b)
-            }
-            Chat(b) => b.to_text(TextMessage::new(self.user_id, "chat")),
-            TrustedUsers(b) => TextMessage::new(self.user_id, "trusted").set_vec_u8("users", &b),
-            SoftReset => TextMessage::new(self.user_id, "softreset"),
-            PrivateChat(b) => b.to_text(TextMessage::new(self.user_id, "privatechat")),
-            Interval(b) => TextMessage::new(self.user_id, "interval").set("msecs", b.to_string()),
-            LaserTrail(b) => b.to_text(TextMessage::new(self.user_id, "lasertrail")),
-            MovePointer(b) => b.to_text(TextMessage::new(self.user_id, "movepointer")),
-            Marker(b) => TextMessage::new(self.user_id, "marker").set("text", b.clone()),
-            UserACL(b) => TextMessage::new(self.user_id, "useracl").set_vec_u8("users", &b),
-            LayerACL(b) => b.to_text(TextMessage::new(self.user_id, "layeracl")),
-            FeatureAccessLevels(b) => {
-                TextMessage::new(self.user_id, "featureaccess").set_vec_u8("feature_tiers", &b)
-            }
-            DefaultLayer(b) => {
-                TextMessage::new(self.user_id, "defaultlayer").set("id", format!("0x{:04x}", b))
-            }
-            Filtered(b) => TextMessage::new(self.user_id, "filtered").set_bytes("message", &b),
-            UndoPoint => TextMessage::new(self.user_id, "undopoint"),
-            CanvasResize(b) => b.to_text(TextMessage::new(self.user_id, "resize")),
-            LayerCreate(b) => b.to_text(TextMessage::new(self.user_id, "newlayer")),
-            LayerAttributes(b) => b.to_text(TextMessage::new(self.user_id, "layerattr")),
-            LayerRetitle(b) => b.to_text(TextMessage::new(self.user_id, "retitlelayer")),
-            LayerOrder(b) => {
-                TextMessage::new(self.user_id, "layerorder").set_vec_u16("layers", &b, true)
-            }
-            LayerDelete(b) => b.to_text(TextMessage::new(self.user_id, "deletelayer")),
-            LayerVisibility(b) => b.to_text(TextMessage::new(self.user_id, "layervisibility")),
-            PutImage(b) => b.to_text(TextMessage::new(self.user_id, "putimage")),
-            FillRect(b) => b.to_text(TextMessage::new(self.user_id, "fillrect")),
-            PenUp => TextMessage::new(self.user_id, "penup"),
-            AnnotationCreate(b) => b.to_text(TextMessage::new(self.user_id, "newannotation")),
-            AnnotationReshape(b) => b.to_text(TextMessage::new(self.user_id, "reshapeannotation")),
-            AnnotationEdit(b) => b.to_text(TextMessage::new(self.user_id, "editannotation")),
-            AnnotationDelete(b) => {
-                TextMessage::new(self.user_id, "deleteannotation").set("id", format!("0x{:04x}", b))
-            }
-            MoveRegion(b) => b.to_text(TextMessage::new(self.user_id, "moveregion")),
-            PutTile(b) => b.to_text(TextMessage::new(self.user_id, "puttile")),
-            CanvasBackground(b) => {
-                TextMessage::new(self.user_id, "background").set_bytes("image", &b)
-            }
-            DrawDabsClassic(b) => b.to_text(TextMessage::new(self.user_id, "classicdabs")),
-            DrawDabsPixel(b) => b.to_text(TextMessage::new(self.user_id, "pixeldabs")),
-            DrawDabsPixelSquare(b) => b.to_text(TextMessage::new(self.user_id, "squarepixeldabs")),
-            Undo(b) => b.to_text(TextMessage::new(self.user_id, "undo")),
+        use Message::*;
+        match &self {
+            Control(m) => m.as_text(),
+            ServerMeta(m) => m.as_text(),
+            ClientMeta(m) => m.as_text(),
+            Command(m) => m.as_text(),
         }
-    }
-
-    pub fn from_text(tm: &TextMessage) -> Option<Self> {
-        use Body::*;
-        Some(Self {
-            user_id: tm.user_id,
-            body: match tm.name.as_ref() {
-                "command" => Command(tm.get_str("msg").to_string()),
-                "disconnect" => Disconnect(DisconnectMessage::from_text(&tm)),
-                "ping" => Ping(tm.get_str("is_pong") == "true"),
-                "join" => Join(JoinMessage::from_text(&tm)),
-                "leave" => Leave,
-                "sessionowner" => SessionOwner(tm.get_vec_u8("users")),
-                "chat" => Chat(ChatMessage::from_text(&tm)),
-                "trusted" => TrustedUsers(tm.get_vec_u8("users")),
-                "softreset" => SoftReset,
-                "privatechat" => PrivateChat(PrivateChatMessage::from_text(&tm)),
-                "interval" => Interval(tm.get_u16("msecs")),
-                "lasertrail" => LaserTrail(LaserTrailMessage::from_text(&tm)),
-                "movepointer" => MovePointer(MovePointerMessage::from_text(&tm)),
-                "marker" => Marker(tm.get_str("text").to_string()),
-                "useracl" => UserACL(tm.get_vec_u8("users")),
-                "layeracl" => LayerACL(LayerACLMessage::from_text(&tm)),
-                "featureaccess" => FeatureAccessLevels(tm.get_vec_u8("feature_tiers")),
-                "defaultlayer" => DefaultLayer(tm.get_u16("id")),
-                "filtered" => Filtered(tm.get_bytes("message")),
-                "undopoint" => UndoPoint,
-                "resize" => CanvasResize(CanvasResizeMessage::from_text(&tm)),
-                "newlayer" => LayerCreate(LayerCreateMessage::from_text(&tm)),
-                "layerattr" => LayerAttributes(LayerAttributesMessage::from_text(&tm)),
-                "retitlelayer" => LayerRetitle(LayerRetitleMessage::from_text(&tm)),
-                "layerorder" => LayerOrder(tm.get_vec_u16("layers")),
-                "deletelayer" => LayerDelete(LayerDeleteMessage::from_text(&tm)),
-                "layervisibility" => LayerVisibility(LayerVisibilityMessage::from_text(&tm)),
-                "putimage" => PutImage(PutImageMessage::from_text(&tm)),
-                "fillrect" => FillRect(FillRectMessage::from_text(&tm)),
-                "penup" => PenUp,
-                "newannotation" => AnnotationCreate(AnnotationCreateMessage::from_text(&tm)),
-                "reshapeannotation" => AnnotationReshape(AnnotationReshapeMessage::from_text(&tm)),
-                "editannotation" => AnnotationEdit(AnnotationEditMessage::from_text(&tm)),
-                "deleteannotation" => AnnotationDelete(tm.get_u16("id")),
-                "moveregion" => MoveRegion(MoveRegionMessage::from_text(&tm)),
-                "puttile" => PutTile(PutTileMessage::from_text(&tm)),
-                "background" => CanvasBackground(tm.get_bytes("image")),
-                "classicdabs" => DrawDabsClassic(DrawDabsClassicMessage::from_text(&tm)),
-                "pixeldabs" => DrawDabsPixel(DrawDabsPixelMessage::from_text(&tm)),
-                "squarepixeldabs" => DrawDabsPixelSquare(DrawDabsPixelMessage::from_text(&tm)),
-                "undo" => Undo(UndoMessage::from_text(&tm)),
-                _ => {
-                    return None;
-                }
-            },
-        })
     }
 }
 

@@ -1,7 +1,6 @@
 use dpcore::canvas::CanvasState;
 use dpcore::paint::*;
-use dpcore::protocol::{Message, TextParser};
-use dpcore::protocol::message::UNDO_DEPTH;
+use dpcore::protocol::message::{CommandMessage, Message, UNDO_DEPTH};
 
 #[test]
 fn test_simple_undo() {
@@ -130,11 +129,7 @@ fn test_branching_undo() {
 
     // A redo now should bring the red back
     canvas.receive_message(&m("1 undo redo=true"));
-    assert_eq!(
-        lc(&canvas),
-        Some(red),
-        "redo should have returned the red"
-    );
+    assert_eq!(lc(&canvas), Some(red), "redo should have returned the red");
 
     // And then the blue
     canvas.receive_message(&m("1 undo redo=true"));
@@ -213,8 +208,11 @@ fn test_undo_depth() {
     assert_eq!(lc(&canvas), Some(red), "undo stack didn't fill up?");
 }
 
-fn m(msg: &str) -> Message {
-    Message::from_text(&msg.parse().unwrap()).unwrap()
+fn m(msg: &str) -> CommandMessage {
+    match Message::from_text(&msg.parse().unwrap()).unwrap() {
+        Message::Command(m) => m,
+        _ => panic!("Not a command message: {}", msg),
+    }
 }
 
 fn lc(canvas: &CanvasState) -> Option<Color> {

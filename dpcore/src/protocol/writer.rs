@@ -76,7 +76,7 @@ impl<W: Write> RecordingWriter for TextWriter<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Body, JoinMessage};
+    use crate::protocol::message::*;
     use std::io::Cursor;
     use std::str;
 
@@ -86,14 +86,17 @@ mod tests {
 
         writer.write_header(&header).unwrap();
         writer
-            .write_message(&Message {
-                user_id: 1,
-                body: Body::Join(JoinMessage {
-                    flags: 0x03,
-                    name: "XYZ".to_string(),
-                    avatar: Vec::new(),
-                }),
-            })
+            .write_message(
+                &ServerMetaMessage::Join(
+                    1,
+                    JoinMessage {
+                        flags: 0x03,
+                        name: "XYZ".to_string(),
+                        avatar: Vec::new(),
+                    },
+                )
+                .into(),
+            )
             .unwrap();
     }
 

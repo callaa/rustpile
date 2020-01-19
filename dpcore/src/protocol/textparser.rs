@@ -1,5 +1,5 @@
-use std::{fmt, mem};
 use std::str::FromStr;
+use std::{fmt, mem};
 
 use super::textmessage::TextMessage;
 

@@ -3,7 +3,7 @@ _protocol:
     undo_depth: 30
 
 # Control messages (transparent)
-Command:
+ServerCommand:
     id: 0
     comment: |
              Server command message

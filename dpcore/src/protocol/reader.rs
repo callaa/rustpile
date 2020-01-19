@@ -314,7 +314,7 @@ impl<R: BufRead> RecordingReader for TextReader<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::message::{Body, JoinMessage};
+    use crate::protocol::message::*;
     use std::io::Cursor;
 
     fn test_reader(reader: &mut dyn RecordingReader) {
@@ -327,14 +327,15 @@ mod tests {
         if let ReadMessage::Ok(m) = reader.read_next() {
             assert_eq!(
                 m,
-                Message {
-                    user_id: 1,
-                    body: Body::Join(JoinMessage {
+                ServerMetaMessage::Join(
+                    1,
+                    JoinMessage {
                         flags: 0x01,
                         name: "ABC".to_string(),
                         avatar: Vec::new(),
-                    })
-                }
+                    }
+                )
+                .into()
             );
         } else {
             panic!("Message deserialization failed!");
