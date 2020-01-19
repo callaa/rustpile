@@ -14,6 +14,16 @@ impl Rectangle {
         Rectangle { x, y, w, h }
     }
 
+    pub fn tile(x: i32, y: i32, size: i32) -> Rectangle {
+        assert!(size > 0);
+        Rectangle {
+            x: x * size,
+            y: y * size,
+            w: size,
+            h: size,
+        }
+    }
+
     pub fn intersected(&self, other: &Rectangle) -> Option<Rectangle> {
         let leftx = max(self.x, other.x);
         let rightx = min(self.x + self.w, other.x + other.w);

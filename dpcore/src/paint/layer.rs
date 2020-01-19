@@ -206,6 +206,8 @@ impl Layer {
         Rc::make_mut(&mut self.tiles)
     }
 
+    /// Return a mutable iterator to the tiles that intersect the given
+    /// rectangle (in normal pixel coordinates)
     pub fn tile_rect_mut(&mut self, r: &Rectangle) -> MutableTileIterator<Tile> {
         assert!(
             r.x >= 0
@@ -271,11 +273,11 @@ impl Layer {
             ])
         } else if (left % TILE_SIZEI) == 0 && (top % TILE_SIZEI) == 0 {
             // Tile aligned resize. Existing tiles can be reused.
-            self.resized_fast(left, top, new_width as u32, new_height as u32)
+            self.resized_fast(left, top, new_width, new_height)
         } else {
             // Uh oh, top/left change not evenly divisible by tile size
             // means we have to rebuild all the tiles
-            self.resized_slow()
+            self.resized_slow(left, top, new_width, new_height)
         };
 
         Layer {
@@ -291,8 +293,69 @@ impl Layer {
         }
     }
 
-    fn resized_slow(&self) -> Rc<Vec<Tile>> {
-        todo!();
+    fn resized_slow(&self, offx: i32, offy: i32, w: u32, h: u32) -> Rc<Vec<Tile>> {
+        let oldxtiles = Tile::div_up(self.width) as i32;
+        let newxtiles = Tile::div_up(w) as i32;
+        let newytiles = Tile::div_up(h) as i32;
+        let mut new_vec = Rc::new(vec![Tile::Blank; (newxtiles * newytiles) as usize]);
+        let tiles = Rc::make_mut(&mut new_vec);
+
+        // Iterate through the original image. Most of the time, the canvas
+        // is being expanded so this is the set of tiles we'd iterate over anyway.
+        for (index, tile) in self.tiles.iter().enumerate() {
+            if *tile == Tile::Blank {
+                continue;
+            }
+
+            let source_tile_geometry = Rectangle::tile(
+                index as i32 % oldxtiles,
+                index as i32 / oldxtiles,
+                TILE_SIZEI,
+            );
+
+            // Where the pixel data should be moved.
+            // It might be out of bounds if the layer is being contracted.
+            let target_rect = source_tile_geometry.offset(offx, offy);
+
+            if let Some(cropped) = target_rect.cropped(w, h) {
+                // It appears to be in bounds.
+
+                // Depending on the offset, the source tile will overlap
+                // with either 2 or 4 destination tiles
+                let dx0 = (cropped.x / TILE_SIZEI) as usize;
+                let dx1 = (cropped.right() / TILE_SIZEI) as usize;
+                let dy0 = (cropped.y / TILE_SIZEI) as usize;
+                let dy1 = (cropped.bottom() / TILE_SIZEI) as usize;
+
+                for (i, j, dest_tile) in MutableTileIterator::new(
+                    tiles,
+                    newxtiles as usize,
+                    dx0,
+                    dy0,
+                    dx1 - dx0 + 1,
+                    dy1 - dy0 + 1,
+                ) {
+                    let destination_tile_geometry = Rectangle::tile(i, j, TILE_SIZEI);
+
+                    // The half or quarter destination tile
+                    let subrect = destination_tile_geometry.intersected(&target_rect).unwrap();
+
+                    // Destination rectangle inside the destination tile
+                    let dest_tile_rect =
+                        subrect.offset(-destination_tile_geometry.x, -destination_tile_geometry.y);
+
+                    // Source rectangle inside the source tile
+                    let source_tile_rect = subrect.offset(-target_rect.x, -target_rect.y);
+
+                    dest_tile
+                        .rect_iter_mut(tile.last_touched_by(), &dest_tile_rect)
+                        .zip(tile.rect_iter(&source_tile_rect))
+                        .for_each(|(d, s)| d.clone_from_slice(s));
+                }
+            }
+        }
+
+        new_vec
     }
 
     fn resized_fast(&self, offx: i32, offy: i32, w: u32, h: u32) -> Rc<Vec<Tile>> {
@@ -328,7 +391,7 @@ impl Layer {
 
 #[cfg(test)]
 mod tests {
-    use super::super::color::WHITE_PIXEL;
+    use super::super::color::{WHITE_PIXEL, ZERO_PIXEL};
     use super::*;
 
     #[test]
@@ -454,5 +517,41 @@ mod tests {
         assert_eq!(layer2.tile(0, 0).solid_color(), None);
         assert_eq!(layer2.tile(0, 1).solid_color(), None);
         assert_eq!(layer2.tile(0, 2).solid_color(), Some(t));
+    }
+
+    #[test]
+    fn test_slow_expand() {
+        let mut layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &Color::rgb8(0, 0, 0));
+        layer
+            .tile_mut(0, 0)
+            .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
+            .next()
+            .unwrap()[0] = WHITE_PIXEL;
+
+        let layer = layer.resized(10, 0, 0, 5);
+
+        assert_eq!(layer.width, TILE_SIZE + 5);
+        assert_eq!(layer.height, TILE_SIZE + 10);
+
+        assert_eq!(layer.pixel_at(0, 0), ZERO_PIXEL);
+        assert_eq!(layer.pixel_at(5, 10), WHITE_PIXEL);
+    }
+
+    #[test]
+    fn test_slow_contract() {
+        let mut layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &Color::TRANSPARENT);
+        layer
+            .tile_mut(0, 0)
+            .rect_iter_mut(0, &Rectangle::new(5, 10, 1, 1))
+            .next()
+            .unwrap()[0] = WHITE_PIXEL;
+
+        let layer = layer.resized(-10, 0, 0, -5);
+
+        assert_eq!(layer.width, TILE_SIZE - 5);
+        assert_eq!(layer.height, TILE_SIZE - 10);
+
+        assert_eq!(layer.pixel_at(5, 10), ZERO_PIXEL);
+        assert_eq!(layer.pixel_at(0, 0), WHITE_PIXEL);
     }
 }
