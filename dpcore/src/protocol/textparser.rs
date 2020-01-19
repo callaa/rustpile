@@ -1,4 +1,5 @@
 use std::{fmt, mem};
+use std::str::FromStr;
 
 use super::textmessage::TextMessage;
 
@@ -43,16 +44,10 @@ impl fmt::Debug for ParseResult {
     }
 }
 
-impl TextParser {
-    pub fn new() -> TextParser {
-        TextParser {
-            msg: None,
-            state: State::ExpectCommand,
-            linenum: 0,
-        }
-    }
+impl FromStr for TextMessage {
+    type Err = String;
 
-    pub fn parse(message: &str) -> Result<TextMessage, String> {
+    fn from_str(message: &str) -> Result<Self, Self::Err> {
         let mut parser = TextParser::new();
         for line in message.lines() {
             match parser.parse_line(line.trim()) {
@@ -62,6 +57,16 @@ impl TextParser {
             }
         }
         Err("Truncated message".to_string())
+    }
+}
+
+impl TextParser {
+    pub fn new() -> TextParser {
+        TextParser {
+            msg: None,
+            state: State::ExpectCommand,
+            linenum: 0,
+        }
     }
 
     pub fn parse_line(&mut self, line: &str) -> ParseResult {
@@ -254,15 +259,15 @@ mod tests {
     fn test_parse() {
         let valid = "1 msg {\nhello=world\n}";
 
-        assert!(
-            TextParser::parse(valid)
-                == Ok(TextMessage::new(1, "msg").set("hello", "world".to_string()))
+        assert_eq!(
+            valid.parse(),
+            Ok(TextMessage::new(1, "msg").set("hello", "world".to_string()))
         );
 
         let invalid = "1 msg {\nx\n}";
-        assert!(TextParser::parse(invalid).is_err());
+        assert!(TextMessage::from_str(invalid).is_err());
 
         let truncated = "1 msg {";
-        assert!(TextParser::parse(truncated).is_err());
+        assert!(TextMessage::from_str(truncated).is_err());
     }
 }

@@ -2,7 +2,7 @@ use base64;
 use std::collections::BTreeMap;
 use std::{fmt, str};
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct TextMessage {
     pub user_id: u8,
     pub name: String,

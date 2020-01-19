@@ -1,5 +1,4 @@
 use dpcore::protocol::message::*;
-use dpcore::protocol::TextParser;
 
 #[test]
 fn test_message_serialization() {
@@ -68,9 +67,8 @@ fn test_message_serialization() {
         assert_eq!(msg.serialize(), sample, "re-serialization");
 
         let text = msg.to_string();
-        let tm = TextParser::parse(&text).unwrap();
         assert_eq!(
-            Message::from_text(&tm).unwrap(),
+            Message::from_text(&text.parse().unwrap()).unwrap(),
             expected,
             "text encode + parsing"
         );

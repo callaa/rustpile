@@ -214,7 +214,7 @@ fn test_undo_depth() {
 }
 
 fn m(msg: &str) -> Message {
-    Message::from_text(&TextParser::parse(&msg).unwrap()).unwrap()
+    Message::from_text(&msg.parse().unwrap()).unwrap()
 }
 
 fn lc(canvas: &CanvasState) -> Option<Color> {
