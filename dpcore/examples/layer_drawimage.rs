@@ -25,5 +25,14 @@ fn main() {
         Blendmode::Normal,
     );
 
+    editlayer::draw_image(
+        &mut layer,
+        0,
+        &image,
+        &Rectangle::new(-w / 2, -h / 2, w, h),
+        1.0,
+        Blendmode::Normal,
+    );
+
     utils::save_layer(&layer, "example_layer_drawimage.png");
 }
