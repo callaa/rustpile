@@ -4,6 +4,7 @@ use super::serialization::{DeserializationError, MessageReader, MessageWriter};
 use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
+use std::str::FromStr;
 
 pub static VERSION: &str = "dp:4.21.2";
 pub const UNDO_DEPTH: u32 = 30;
@@ -270,8 +271,8 @@ impl MovePointerMessage {
 
     fn from_text(tm: &TextMessage) -> Self {
         Self {
-            x: tm.get_u32("x") as i32,
-            y: tm.get_u32("y") as i32,
+            x: i32::from_str(tm.get_str("x")).unwrap_or_default(),
+            y: i32::from_str(tm.get_str("y")).unwrap_or_default(),
         }
     }
 }
@@ -366,10 +367,10 @@ impl CanvasResizeMessage {
 
     fn from_text(tm: &TextMessage) -> Self {
         Self {
-            top: tm.get_u32("top") as i32,
-            right: tm.get_u32("right") as i32,
-            bottom: tm.get_u32("bottom") as i32,
-            left: tm.get_u32("left") as i32,
+            top: i32::from_str(tm.get_str("top")).unwrap_or_default(),
+            right: i32::from_str(tm.get_str("right")).unwrap_or_default(),
+            bottom: i32::from_str(tm.get_str("bottom")).unwrap_or_default(),
+            left: i32::from_str(tm.get_str("left")).unwrap_or_default(),
         }
     }
 }
@@ -793,8 +794,8 @@ impl AnnotationCreateMessage {
     fn from_text(tm: &TextMessage) -> Self {
         Self {
             id: tm.get_u16("id"),
-            x: tm.get_u32("x") as i32,
-            y: tm.get_u32("y") as i32,
+            x: i32::from_str(tm.get_str("x")).unwrap_or_default(),
+            y: i32::from_str(tm.get_str("y")).unwrap_or_default(),
             w: tm.get_u16("w"),
             h: tm.get_u16("h"),
         }
@@ -845,8 +846,8 @@ impl AnnotationReshapeMessage {
     fn from_text(tm: &TextMessage) -> Self {
         Self {
             id: tm.get_u16("id"),
-            x: tm.get_u32("x") as i32,
-            y: tm.get_u32("y") as i32,
+            x: i32::from_str(tm.get_str("x")).unwrap_or_default(),
+            y: i32::from_str(tm.get_str("y")).unwrap_or_default(),
             w: tm.get_u16("w"),
             h: tm.get_u16("h"),
         }
@@ -1006,18 +1007,18 @@ impl MoveRegionMessage {
     fn from_text(tm: &TextMessage) -> Self {
         Self {
             layer: tm.get_u16("layer"),
-            bx: tm.get_u32("bx") as i32,
-            by: tm.get_u32("by") as i32,
-            bw: tm.get_u32("bw") as i32,
-            bh: tm.get_u32("bh") as i32,
-            x1: tm.get_u32("x1") as i32,
-            y1: tm.get_u32("y1") as i32,
-            x2: tm.get_u32("x2") as i32,
-            y2: tm.get_u32("y2") as i32,
-            x3: tm.get_u32("x3") as i32,
-            y3: tm.get_u32("y3") as i32,
-            x4: tm.get_u32("x4") as i32,
-            y4: tm.get_u32("y4") as i32,
+            bx: i32::from_str(tm.get_str("bx")).unwrap_or_default(),
+            by: i32::from_str(tm.get_str("by")).unwrap_or_default(),
+            bw: i32::from_str(tm.get_str("bw")).unwrap_or_default(),
+            bh: i32::from_str(tm.get_str("bh")).unwrap_or_default(),
+            x1: i32::from_str(tm.get_str("x1")).unwrap_or_default(),
+            y1: i32::from_str(tm.get_str("y1")).unwrap_or_default(),
+            x2: i32::from_str(tm.get_str("x2")).unwrap_or_default(),
+            y2: i32::from_str(tm.get_str("y2")).unwrap_or_default(),
+            x3: i32::from_str(tm.get_str("x3")).unwrap_or_default(),
+            y3: i32::from_str(tm.get_str("y3")).unwrap_or_default(),
+            x4: i32::from_str(tm.get_str("x4")).unwrap_or_default(),
+            y4: i32::from_str(tm.get_str("y4")).unwrap_or_default(),
             mask: tm.get_bytes("mask"),
         }
     }
@@ -1308,8 +1309,8 @@ impl DrawDabsPixelMessage {
 
         Self {
             layer: tm.get_u16("layer"),
-            x: tm.get_u32("x") as i32,
-            y: tm.get_u32("y") as i32,
+            x: i32::from_str(tm.get_str("x")).unwrap_or_default(),
+            y: i32::from_str(tm.get_str("y")).unwrap_or_default(),
             color: tm.get_argb32("color"),
             mode: tm.get_u8("mode"),
             dabs: dab_structs,

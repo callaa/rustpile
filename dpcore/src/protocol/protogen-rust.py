@@ -11,6 +11,7 @@ use super::serialization::{MessageReader, MessageWriter, DeserializationError};
 use super::textmessage::TextMessage;
 use std::convert::TryInto;
 use std::fmt;
+use std::str::FromStr;
 
 pub static VERSION: &str = "{{ version }}";
 pub const UNDO_DEPTH: u32 = {{ undo_depth }};
@@ -422,10 +423,10 @@ def textmessage_getfield(var, field):
     elif field.field_type in ("u8", "u16", "u32", "i8", "i16", "i32"):
         if field.format.startswith("div"):
             return f'({var}.get_f64("{field.name}") * {field.format[3:]}.0) as {field.field_type}'
+        elif field.field_type.startswith("u"):
+            return f'{var}.get_{field.field_type}("{field.name}")'
         else:
-            utype = field.field_type.replace('i', 'u')
-            astype = f' as {field.field_type}' if field.field_type.startswith('i') else ''
-            return f'{var}.get_{utype}("{field.name}"){astype}'
+            return f'{field.field_type}::from_str({var}.get_str("{field.name}")).unwrap_or_default()'
     else:
         raise ValueError("Unhandled textfield get type: " + field.field_type)
 
