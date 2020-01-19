@@ -2,7 +2,11 @@
 
 from yaml import safe_load as load_yaml
 
-import sys
+
+MSG_TYPE_CTRL = "Control"
+MSG_TYPE_SRV_META = "ServerMeta"
+MSG_TYPE_CLIENT_META = "ClientMeta"
+MSG_TYPE_CMD = "Command"
 
 
 class BadDefinition(Exception):
@@ -15,6 +19,7 @@ class Message:
         self.cmd_name = desc.get('name', name.lower())
         self.id = _required(name, desc, 'id', int)
         self.comment = str(desc.get('comment', ''))
+        self.reserved = False
 
         if 'alias' in desc:
             try:
@@ -24,7 +29,11 @@ class Message:
             self.fields = []
 
         else:
-            fields = _required(name, desc, 'fields', list)
+            if desc.get('reserved', False):
+                fields = []
+                self.reserved = True
+            else:
+                fields = _required(name, desc, 'fields', list)
 
             self.alias = None
             self.fields = []
@@ -64,6 +73,30 @@ class Message:
 
         return (fixed, arrays)
 
+    @property
+    def message_type(self):
+        if self.id < 0 or self.id > 255:
+            raise ValueError("Message ID must be in range 0..255")
+
+        # Control type messages are used for client <-> server commands
+        if self.id < 32:
+            return MSG_TYPE_CTRL
+
+        # Meta messages have no direct effect on the canvas,
+        # but are used for things like chat or changing the way messages
+        # are filtered.
+        # Server meta (AKA transparent meta) messages are those the server
+        # needs to understand
+        if self.id < 64:
+            return MSG_TYPE_SRV_META
+
+        # Client meta (AKA opaque meta) are for client<->client communication
+        # only. A thin server does not need to understand these.
+        if self.id < 128:
+            return MSG_TYPE_CLIENT_META
+
+        # Command messages are interpeted by the paint engine
+        return MSG_TYPE_CMD
 
     def __repr__(self):
         out = []
@@ -332,9 +365,38 @@ def load_protocol_definition():
 
 
 if __name__ == '__main__':
+    import sys
     proto = load_protocol_definition()
     print("Protocol version:", proto['version'])
+
+    if len(sys.argv) > 1:
+        if sys.argv[1] == '--short':
+            prev = (0, None)
+            for m in proto['messages']:
+
+                if prev[1] == m.message_type:
+                    hole = m.id - prev[0]
+                    if hole > 10:
+                        print(f"## {hole-2} unused IDs")
+                    elif hole > 1:
+                        for i in range(prev[0]+1, m.id):
+                            print(f"# Missing #{i}")
+
+                if m.reserved:
+                    print(f"{m.id} [RESERVED] {m.name} ({m.comment})")
+                else:
+                    print(f"{m.id} [{m.message_type}] {m.name}")
+
+                prev = (m.id, m.message_type)
+
+            sys.exit(0)
+
+        else:
+            print("Unknown argument:", sys.argv[1])
+            sys.exit(1)
+
     for m in proto['messages']:
-        print(repr(m))
-        print("")
+        if not m.reserved:
+            print(repr(m))
+            print("")
 

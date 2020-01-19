@@ -28,6 +28,11 @@ Disconnect:
         - reason u8
         - message utf8
 
+Internal:
+    id: 31
+    comment: Reserved for internal use
+    reserved: true
+
 Ping:
     id: 2
     comment: |
@@ -255,7 +260,10 @@ Filtered:
     fields:
         - message bytes
 
-# Id 73 reserved for non-standard extension use.
+Extension:
+    id: 73
+    comment: Reserved for non-standard extension use
+    reserved: true
 
 # Command messages (opaque)
 UndoPoint:
@@ -431,6 +439,16 @@ FillRect:
         - w u32
         - h u32
         - color argb32
+
+ToolChange:
+    id: 138
+    comment: Removed in version 2.1
+    reserved: true
+
+PenMove:
+    id: 139
+    comment: Removed in version 2.1
+    reserved: true
 
 PenUp:
     id: 140

@@ -421,7 +421,7 @@ if __name__ == '__main__':
     protocol = load_protocol_definition()
 
     print(template.render(
-        messages=protocol['messages'],
+        messages=[m for m in protocol['messages'] if not m.reserved],
         version=protocol['version'],
         undo_depth=protocol['undo_depth'],
         field_rust_type=field_rust_type,
