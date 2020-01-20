@@ -120,6 +120,11 @@ impl Layer {
         }
     }
 
+    /// Check if a sublayer with the given ID exists
+    pub fn has_sublayer(&self, id: LayerID) -> bool {
+        self.sublayers.iter().any(|sl| sl.id == id)
+    }
+
     pub fn width(&self) -> u32 {
         self.width
     }

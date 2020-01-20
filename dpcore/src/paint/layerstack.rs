@@ -155,6 +155,14 @@ impl LayerStack {
             height: new_height as u32,
         })
     }
+
+    pub fn iter_layers(&self) -> impl Iterator<Item=&Layer> {
+        return self.layers.iter().map(|l| l.as_ref())
+    }
+
+    pub fn iter_layers_mut(&mut self) -> impl Iterator<Item=&mut Rc<Layer>> {
+        return Rc::make_mut(&mut self.layers).iter_mut()
+    }
 }
 
 #[cfg(test)]

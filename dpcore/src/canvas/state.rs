@@ -82,8 +82,20 @@ impl CanvasState {
         }
     }
 
+    /// Penup does nothing but end indirect strokes.
+    /// This is done by merging this user's sublayers.
     fn handle_penup(&mut self, user_id: UserID) {
-        // TODO
+        let sublayer_id = user_id as LayerID;
+
+        // Note: we could do a read-only pass first to check if
+        // this is necesary at all, but we can just as well simply
+        // not send unnecessary PenUps.
+
+        // TODO map to AoE
+        Rc::make_mut(&mut self.layerstack)
+            .iter_layers_mut()
+            .filter(|l| l.has_sublayer(sublayer_id)) // avoid unnecessary clones
+            .for_each(|l| { editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id); });
     }
 
     fn handle_canvas_resize(&mut self, msg: &CanvasResizeMessage) {
