@@ -36,22 +36,28 @@ impl CanvasState {
     fn handle_message(&mut self, msg: &CommandMessage) {
         use CommandMessage::*;
         match &msg {
-            DrawDabsClassic(user, m) => self.handle_drawdabs_classic(*user, m),
-            DrawDabsPixel(user, m) => self.handle_drawdabs_pixel(*user, m, false),
-            DrawDabsPixelSquare(user, m) => self.handle_drawdabs_pixel(*user, m, true),
-
             UndoPoint(user) => self.handle_undopoint(*user),
-            PenUp(user) => self.handle_penup(*user),
-            Undo(user, m) => self.handle_undo(*user, m),
-
             CanvasResize(_, m) => self.handle_canvas_resize(m),
             LayerCreate(_, m) => self.handle_layer_create(m),
             LayerAttributes(_, m) => self.handle_layer_attributes(m),
+            LayerRetitle(_, m) => todo!(),
+            LayerOrder(_, order) => todo!(),
+            LayerDelete(_, m) => todo!(),
+            LayerVisibility(u, m) => todo!(),
+            PutImage(u, m) => todo!(),
+            FillRect(user, m) => self.handle_fillrect(*user, m),
+            PenUp(user) => self.handle_penup(*user),
+            AnnotationCreate(_, m) => todo!(),
+            AnnotationReshape(_, m) => todo!(),
+            AnnotationEdit(_, m) => todo!(),
+            AnnotationDelete(_, m) => todo!(),
+            MoveRegion(_, _) => unimplemented!(),
             PutTile(user, m) => self.handle_puttile(*user, m),
             CanvasBackground(_, m) => self.handle_background(m),
-            FillRect(user, m) => self.handle_fillrect(*user, m),
-
-            _ => todo!("Unhandled message: {}", msg),
+            DrawDabsClassic(user, m) => self.handle_drawdabs_classic(*user, m),
+            DrawDabsPixel(user, m) => self.handle_drawdabs_pixel(*user, m, false),
+            DrawDabsPixelSquare(user, m) => self.handle_drawdabs_pixel(*user, m, true),
+            Undo(user, m) => self.handle_undo(*user, m),
         }
     }
 
