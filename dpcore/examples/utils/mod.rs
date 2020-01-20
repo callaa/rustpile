@@ -33,10 +33,10 @@ pub fn load_image(filename: &str) -> (Vec<Pixel>, i32, i32) {
 
     for p in rgba.pixels() {
         argb_data.push([
-            p.0[3],
-            u8_mult(p.0[3], p.0[0]),
-            u8_mult(p.0[3], p.0[1]),
             u8_mult(p.0[3], p.0[2]),
+            u8_mult(p.0[3], p.0[1]),
+            u8_mult(p.0[3], p.0[0]),
+            p.0[3],
         ]);
     }
 

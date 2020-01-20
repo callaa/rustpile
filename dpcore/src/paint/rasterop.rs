@@ -112,13 +112,13 @@ fn alpha_mask_under(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
     for (dp, &mask) in base.iter_mut().zip(mask.iter()) {
         let bp = dp.into_work();
         let m = mask as u32;
-        let a = u8_mult(255 - bp[0], m);
+        let a = u8_mult(255 - bp[ALPHA_CHANNEL], m);
 
         let result = [
-            bp[0] + a,
+            bp[0] + u8_mult(c[0], a),
             bp[1] + u8_mult(c[1], a),
             bp[2] + u8_mult(c[2], a),
-            bp[3] + u8_mult(c[3], a),
+            bp[3] + a,
         ];
 
         *dp = Pixel::from_work(result);
@@ -215,10 +215,10 @@ fn alpha_mask_blend(base: &mut [Pixel], color: Pixel, mask: &[u8]) {
         let a = 255 - m;
 
         let result = [
-            m + u8_mult(bp[0], a),
+            u8_mult(c[0], m) + u8_mult(bp[0], a),
             u8_mult(c[1], m) + u8_mult(bp[1], a),
             u8_mult(c[2], m) + u8_mult(bp[2], a),
-            u8_mult(c[3], m) + u8_mult(bp[3], a),
+            m + u8_mult(bp[3], a),
         ];
 
         *dp = Pixel::from_work(result);
@@ -337,26 +337,30 @@ mod tests {
 
     #[test]
     fn test_alpha_pixel_blend() {
-        let mut base = [[255, 255, 0, 0]];
-        let over = [[128, 0, 128, 0]];
+        let mut base = [[255, 0, 0, 255]];
+        let over = [[0, 128, 0, 128]];
 
         alpha_pixel_blend(&mut base, &over, 0xff);
-        assert_eq!(base, [[255, 127, 128, 0]]);
+        assert_eq!(base, [[127, 128, 0, 255]]);
 
-        let mut base = [[255, 255, 0, 0]];
+        let mut base = [[255, 0, 0, 255]];
         alpha_pixel_blend(&mut base, &over, 0x80);
-        assert_eq!(base, [[255, 191, 64, 0]]);
+        assert_eq!(base, [[191, 64, 0, 255]]);
     }
 
     #[test]
     fn test_alpha_mask_blend() {
-        let mut base = [[255, 255, 0, 0], [255, 255, 0, 0], [255, 255, 0, 0]];
+        let mut base = [Color::rgb8(255, 0, 0).as_pixel();3];
         let mask = [0xff, 0x80, 0x40];
 
-        alpha_mask_blend(&mut base, [0, 0, 255, 0], &mask);
+        alpha_mask_blend(&mut base, Color::rgb8(0, 0, 255).as_pixel(), &mask);
         assert_eq!(
             base,
-            [[255, 0, 255, 0], [255, 127, 128, 0], [255, 191, 64, 0]]
+            [
+                Color::rgb8(0, 0, 255).as_pixel(),
+                Color::rgb8(127, 0, 128).as_pixel(),
+                Color::rgb8(191, 0, 64).as_pixel(),
+            ]
         );
     }
 
@@ -367,7 +371,7 @@ mod tests {
             [255, 255, 255, 255],
             [255, 255, 255, 255],
         ];
-        let over = [[255, 1, 2, 3], [128, 1, 2, 3], [0, 1, 2, 3]];
+        let over = [[1, 2, 3, 255], [1, 2, 3, 128], [1, 2, 3, 0]];
 
         alpha_pixel_erase(&mut base, &over, 0xff);
         assert_eq!(

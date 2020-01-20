@@ -1,5 +1,6 @@
 use super::brushes;
 use super::history::History;
+use super::compression;
 use crate::paint::tile::Tile;
 use crate::paint::{
     editlayer, Blendmode, ClassicBrushCache, Color, LayerID, LayerStack, Rectangle, UserID,
@@ -139,22 +140,16 @@ impl CanvasState {
     fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
-            let tile = if msg.image.len() == 4 {
-                let color =
-                    Color::from_argb32(u32::from_be_bytes(msg.image[..].try_into().unwrap()));
-                Tile::new(&color, user_id)
-            } else {
-                todo!() // DEFLATE
-            };
-
-            editlayer::put_tile(
-                layer,
-                msg.sublayer as LayerID,
-                msg.col.into(),
-                msg.row.into(),
-                msg.repeat.into(),
-                &tile,
-            );
+            if let Some(tile) = compression::decompress_tile(&msg.image, user_id) {
+                editlayer::put_tile(
+                    layer,
+                    msg.sublayer as LayerID,
+                    msg.col.into(),
+                    msg.row.into(),
+                    msg.repeat.into(),
+                    &tile,
+                );
+            }
         } else {
             warn!("PutTile: Layer {:04x} not found!", msg.layer);
         }

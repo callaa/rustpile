@@ -565,10 +565,10 @@ PutTile:
              with incomplete indirect strokes. Sending a PenUp command will merge the sublayer.
     fields:
         - layer u16: hex
+        - sublayer u8
         - col u16
         - row u16
         - repeat u16
-        - sublayer u8
         - image bytes
 
 CanvasBackground:

@@ -1,10 +1,11 @@
 pub type Pixel = [u8; 4];
 
-pub const ALPHA_CHANNEL: usize = 0;
-pub const RED_CHANNEL: usize = 1;
-pub const GREEN_CHANNEL: usize = 2;
-pub const BLUE_CHANNEL: usize = 3;
-pub const RGB_CHANNELS: std::ops::RangeInclusive<usize> = 1..=3;
+pub const BLUE_CHANNEL: usize = 0;
+pub const GREEN_CHANNEL: usize = 1;
+pub const RED_CHANNEL: usize = 2;
+pub const ALPHA_CHANNEL: usize = 3;
+
+pub const RGB_CHANNELS: std::ops::RangeInclusive<usize> = 0..=2;
 pub const ZERO_PIXEL: Pixel = [0, 0, 0, 0];
 pub const WHITE_PIXEL: Pixel = [255, 255, 255, 255];
 
@@ -69,10 +70,10 @@ impl Color {
     pub fn as_pixel(&self) -> Pixel {
         let af = self.a * 255.0;
         [
-            (self.a * 255.0) as u8,
-            (self.r * af) as u8,
-            (self.g * af) as u8,
             (self.b * af) as u8,
+            (self.g * af) as u8,
+            (self.r * af) as u8,
+            (self.a * 255.0) as u8,
         ]
     }
 }

@@ -1027,10 +1027,10 @@ impl MoveRegionMessage {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PutTileMessage {
     pub layer: u16,
+    pub sublayer: u8,
     pub col: u16,
     pub row: u16,
     pub repeat: u16,
-    pub sublayer: u8,
     pub image: Vec<u8>,
 }
 
@@ -1039,18 +1039,18 @@ impl PutTileMessage {
         let mut reader = MessageReader::new(buf).check_len(9, 65535, 146, 0)?;
 
         let layer = reader.read::<u16>();
+        let sublayer = reader.read::<u8>();
         let col = reader.read::<u16>();
         let row = reader.read::<u16>();
         let repeat = reader.read::<u16>();
-        let sublayer = reader.read::<u8>();
         let image = reader.read_remaining_vec::<u8>();
 
         Ok(Self {
             layer,
+            sublayer,
             col,
             row,
             repeat,
-            sublayer,
             image,
         })
     }
@@ -1058,10 +1058,10 @@ impl PutTileMessage {
     fn serialize(&self, user_id: u8) -> Vec<u8> {
         let mut w = MessageWriter::with_expected_payload(146, user_id, 9 + self.image.len());
         w.write(self.layer);
+        w.write(self.sublayer);
         w.write(self.col);
         w.write(self.row);
         w.write(self.repeat);
-        w.write(self.sublayer);
         w.write(&self.image);
 
         w.into()
@@ -1069,20 +1069,20 @@ impl PutTileMessage {
 
     fn to_text(&self, txt: TextMessage) -> TextMessage {
         txt.set("layer", format!("0x{:04x}", self.layer))
+            .set("sublayer", self.sublayer.to_string())
             .set("col", self.col.to_string())
             .set("row", self.row.to_string())
             .set("repeat", self.repeat.to_string())
-            .set("sublayer", self.sublayer.to_string())
             .set_bytes("image", &self.image)
     }
 
     fn from_text(tm: &TextMessage) -> Self {
         Self {
             layer: tm.get_u16("layer"),
+            sublayer: tm.get_u8("sublayer"),
             col: tm.get_u16("col"),
             row: tm.get_u16("row"),
             repeat: tm.get_u16("repeat"),
-            sublayer: tm.get_u8("sublayer"),
             image: tm.get_bytes("image"),
         }
     }

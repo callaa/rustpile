@@ -7,7 +7,7 @@ use super::{rasterop, Blendmode, Rectangle, UserID};
 
 pub const TILE_SIZE: u32 = 64;
 pub const TILE_SIZEI: i32 = TILE_SIZE as i32;
-const TILE_LENGTH: usize = (TILE_SIZE * TILE_SIZE) as usize;
+pub const TILE_LENGTH: usize = (TILE_SIZE * TILE_SIZE) as usize;
 
 #[derive(Clone)]
 pub struct TileData {
@@ -67,6 +67,13 @@ impl Tile {
     // A bitmap tile is constructed even if the color is transparent.
     pub fn new_solid(color: &Color, user: UserID) -> Tile {
         Tile::Bitmap(Rc::new(TileData::new(color.as_pixel(), user)))
+    }
+
+    pub fn from_data(data: &[Pixel], user: UserID) -> Tile {
+        assert_eq!(data.len(), TILE_LENGTH, "Wrong tile data length");
+        let mut td = Rc::new(TileData::new(ZERO_PIXEL, user));
+        Rc::make_mut(&mut td).pixels.clone_from_slice(data);
+        Tile::Bitmap(td)
     }
 
     pub fn div_up(x: u32) -> u32 {
