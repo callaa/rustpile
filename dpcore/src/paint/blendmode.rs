@@ -35,3 +35,7 @@ impl Blendmode {
         }
     }
 }
+
+impl Default for Blendmode {
+    fn default() -> Self { Blendmode::Normal }
+}

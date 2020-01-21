@@ -52,3 +52,33 @@ pub fn decompress_tile(data: &[u8], user_id: UserID) -> Option<Tile> {
 
     Some(Tile::from_data(pixels, user_id))
 }
+
+pub fn decompress_image(data: &[u8], expected_len: usize) -> Option<Vec<Pixel>> {
+    if data.len() < 4 {
+        warn!("decompress_image: data too short!");
+        return None;
+    }
+
+    let expected_bytes_len = expected_len * mem::size_of::<Pixel>();
+    let prefix = u32::from_be_bytes(data[..4].try_into().unwrap());
+    if prefix as usize != expected_bytes_len {
+        warn!("decompress_image: wrong length (was {}, expected {})", prefix, expected_bytes_len);
+        return None;
+    }
+
+    let decompressed = match inflate_bytes_zlib(&data[4..]) {
+        Ok(d) => d,
+        Err(status) => {
+            warn!("decompress_image: decompression failed: {:?}", status);
+            return None;
+        }
+    };
+
+    if decompressed.len() != expected_bytes_len {
+        warn!("decompress_image: decompressed length is not what was expected (was {}, expected {})", decompressed.len(), expected_bytes_len);
+        return None;
+    }
+
+    let pixels: Vec<Pixel> = decompressed.chunks_exact(4).map(|p| p.try_into().unwrap()).collect();
+    return Some(pixels);
+}

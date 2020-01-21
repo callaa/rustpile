@@ -48,7 +48,7 @@ impl CanvasState {
             LayerOrder(_, order) => self.handle_layer_order(order),
             LayerDelete(_, m) => self.handle_layer_delete(m),
             LayerVisibility(u, m) => self.handle_layer_visibility(*u, m),
-            PutImage(u, m) => todo!(),
+            PutImage(u, m) => self.handle_putimage(*u, m),
             FillRect(user, m) => self.handle_fillrect(*user, m),
             PenUp(user) => self.handle_penup(*user),
             AnnotationCreate(_, m) => todo!(),
@@ -211,6 +211,31 @@ impl CanvasState {
         }
     }
 
+    fn handle_putimage(&mut self, user_id: UserID, msg: &PutImageMessage) {
+        if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID) {
+            if msg.w == 0 || msg.h == 0 {
+                warn!("PutImage: zero size!");
+                return;
+            }
+            if msg.w > 65535 || msg.h > 65535 {
+                warn!("PutImage: oversize image! ({}, {})", msg.w, msg.h);
+                return;
+            }
+            if let Some(imagedata) = compression::decompress_image(&msg.image, (msg.w * msg.h) as usize) {
+                editlayer::draw_image(
+                    layer,
+                    user_id,
+                    &imagedata,
+                    &Rectangle::new(msg.x as i32, msg.y as i32, msg.w as i32, msg.h as i32),
+                    1.0,
+                    Blendmode::try_from(msg.mode).unwrap_or_default(),
+                );
+            }
+        } else {
+            warn!("PutImage: Layer {:04x} not found!", msg.layer);
+        }
+    }
+
     fn handle_background(&mut self, pixels: &[u8]) {
         let tile = if pixels.len() == 4 {
             let color = Color::from_argb32(u32::from_be_bytes(pixels[..].try_into().unwrap()));
@@ -234,7 +259,7 @@ impl CanvasState {
                 layer,
                 user,
                 &Color::from_argb32(msg.color),
-                Blendmode::try_from(msg.mode).unwrap_or(Blendmode::Normal),
+                Blendmode::try_from(msg.mode).unwrap_or_default(),
                 &Rectangle::new(msg.x as i32, msg.y as i32, msg.w as i32, msg.h as i32),
             );
         } else {
