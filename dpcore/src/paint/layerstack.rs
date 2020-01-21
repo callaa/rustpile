@@ -3,7 +3,7 @@ use std::rc::Rc;
 use super::annotation::Annotation;
 use super::color::{Color, Pixel, ZERO_PIXEL};
 use super::tile::{Tile, TileData, TILE_SIZE};
-use super::Layer;
+use super::{Layer, LayerID};
 
 #[derive(Clone)]
 pub struct LayerStack {
@@ -12,6 +12,17 @@ pub struct LayerStack {
     pub background: Tile,
     width: u32,
     height: u32,
+}
+
+pub enum LayerFill {
+    Solid(Color),
+    Copy(LayerID),
+}
+
+pub enum LayerInsertion {
+    Top,
+    Above(LayerID),
+    Bottom,
 }
 
 impl LayerStack {
@@ -36,13 +47,29 @@ impl LayerStack {
     /// Add a new layer and return a mutable reference to it
     ///
     /// If a layer with the given ID exists already, None will be returned.
-    pub fn add_layer(&mut self, id: i32, fill: &Color) -> Option<&mut Layer> {
+    /// If fill is Copy and the source layer does not exist, None will be returned.
+    pub fn add_layer(&mut self, id: i32, fill: LayerFill, pos: LayerInsertion) -> Option<&mut Layer> {
         if self.find_layer_index(id).is_some() {
             return None;
         }
 
+        let insert_idx = match pos {
+            LayerInsertion::Top => self.layers.len(),
+            LayerInsertion::Above(layer_id) => self.find_layer_index(layer_id)? + 1,
+            LayerInsertion::Bottom => 0,
+        };
+
+        let new_layer = match fill {
+            LayerFill::Solid(c) => Rc::new(Layer::new(id, self.width, self.height, &c)),
+            LayerFill::Copy(src_id) => {
+                let mut l = self.layers[self.find_layer_index(src_id)?].clone();
+                Rc::make_mut(&mut l).id = id;
+                l
+            }
+        };
+
         let layers = Rc::make_mut(&mut self.layers);
-        layers.push(Rc::new(Layer::new(id, self.width, self.height, fill)));
+        layers.insert(insert_idx, new_layer);
         Some(Rc::make_mut(layers.last_mut().unwrap()))
     }
 
@@ -172,24 +199,41 @@ mod tests {
     #[test]
     fn test_layer_addition() {
         let mut stack = LayerStack::new(256, 256);
-        stack.add_layer(1, &Color::TRANSPARENT);
+        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
 
         // Adding a layer with an existing ID does nothing
-        assert!(stack.add_layer(1, &Color::TRANSPARENT).is_none());
+        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_none());
 
-        let layer = stack.get_layer(1).unwrap();
+        // One more layer on top
+        assert!(stack.add_layer(2, LayerFill::Solid(Color::rgb8(255, 0, 0)), LayerInsertion::Top).is_some());
+
+        // Duplicate layer on top
+        assert!(stack.add_layer(3, LayerFill::Copy(1), LayerInsertion::Top).is_some());
+
+        // Insert layer above the bottom-most
+        assert!(stack.add_layer(4, LayerFill::Solid(Color::rgb8(0, 255, 0)), LayerInsertion::Above(1)).is_some());
+
+        // Insert layer at the bottom
+        assert!(stack.add_layer(5, LayerFill::Solid(Color::rgb8(0, 0, 255)), LayerInsertion::Bottom).is_some());
+
+        // Insert layer above the topmost
+        assert!(stack.add_layer(6, LayerFill::Solid(Color::rgb8(0, 0, 255)), LayerInsertion::Above(3)).is_some());
 
         assert!(stack.get_layer(0).is_none());
-        assert_eq!(layer.width(), 256);
-        assert_eq!(layer.height(), 256);
+        assert_eq!(stack.layers[0].id, 5);
+        assert_eq!(stack.layers[1].id, 1);
+        assert_eq!(stack.layers[2].id, 4);
+        assert_eq!(stack.layers[3].id, 2);
+        assert_eq!(stack.layers[4].id, 3);
+        assert_eq!(stack.layers[5].id, 6);
     }
 
     #[test]
     fn test_layer_removal() {
         let mut stack = LayerStack::new(256, 256);
-        stack.add_layer(1, &Color::TRANSPARENT);
-        stack.add_layer(2, &Color::TRANSPARENT);
-        stack.add_layer(3, &Color::TRANSPARENT);
+        stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
+        stack.add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
+        stack.add_layer(3, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
 
         assert_eq!(stack.layers.len(), 3);
         stack.remove_layer(2);
@@ -203,8 +247,8 @@ mod tests {
     fn test_flattening() {
         let mut stack = LayerStack::new(128, 64);
         stack.background = Tile::new_solid(&Color::rgb8(255, 255, 255), 0);
-        stack.add_layer(1, &Color::TRANSPARENT);
-        stack.add_layer(2, &Color::TRANSPARENT);
+        stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
+        stack.add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
 
         let layer = stack.get_layer_mut(1).unwrap();
         *layer.tile_mut(0, 0) = Tile::new_solid(&Color::rgb8(255, 0, 0), 0);

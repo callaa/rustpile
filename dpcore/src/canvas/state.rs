@@ -2,8 +2,9 @@ use super::brushes;
 use super::history::History;
 use super::compression;
 use crate::paint::tile::Tile;
+use crate::paint::layerstack::{LayerStack, LayerInsertion, LayerFill};
 use crate::paint::{
-    editlayer, Blendmode, ClassicBrushCache, Color, LayerID, LayerStack, Rectangle, UserID,
+    editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID,
 };
 use crate::protocol::message::*;
 
@@ -41,7 +42,7 @@ impl CanvasState {
             CanvasResize(_, m) => self.handle_canvas_resize(m),
             LayerCreate(_, m) => self.handle_layer_create(m),
             LayerAttributes(_, m) => self.handle_layer_attributes(m),
-            LayerRetitle(_, m) => todo!(),
+            LayerRetitle(_, m) => self.handle_layer_retitle(m),
             LayerOrder(_, order) => todo!(),
             LayerDelete(_, m) => todo!(),
             LayerVisibility(u, m) => todo!(),
@@ -117,9 +118,26 @@ impl CanvasState {
     }
 
     fn handle_layer_create(&mut self, msg: &LayerCreateMessage) {
-        // TODO placement, clone, name
-        Rc::make_mut(&mut self.layerstack)
-            .add_layer(msg.id as LayerID, &Color::from_argb32(msg.fill));
+        let pos = match (msg.flags & LayerCreateMessage::FLAGS_INSERT != 0, msg.source) {
+            (true, 0) => LayerInsertion::Bottom,
+            (true, source) => LayerInsertion::Above(source as LayerID),
+            (false, _) => LayerInsertion::Top,
+        };
+
+        let fill = if msg.flags & LayerCreateMessage::FLAGS_COPY != 0 {
+            LayerFill::Copy(msg.source as LayerID)
+        } else {
+            LayerFill::Solid(Color::from_argb32(msg.fill))
+        };
+
+        if let Some(layer) = Rc::make_mut(&mut self.layerstack)
+            .add_layer(msg.id as LayerID, fill, pos) {
+            layer.title = msg.name.clone();
+
+        } else {
+            // todo add_layer could return Result instead with a better error message
+            warn!("LayerCreate: layer {:04x} could not be created", msg.id);
+        }
     }
 
     fn handle_layer_attributes(&mut self, msg: &LayerAttributesMessage) {
@@ -134,6 +152,14 @@ impl CanvasState {
             );
         } else {
             warn!("LayerAttributes: Layer {:04x} not found!", msg.id);
+        }
+    }
+
+    fn handle_layer_retitle(&mut self, msg: &LayerRetitleMessage) {
+        if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID) {
+            layer.title = msg.title.clone()
+        } else {
+            warn!("LayerRetitle: Layer {:04x} not found!", msg.id);
         }
     }
 

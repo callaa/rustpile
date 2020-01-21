@@ -18,6 +18,7 @@ use super::LayerID;
 #[derive(Clone)]
 pub struct Layer {
     pub id: LayerID,
+    pub title: String,
     pub opacity: f32,
     pub hidden: bool,
     pub censored: bool,
@@ -34,6 +35,7 @@ impl Layer {
     pub fn new(id: i32, width: u32, height: u32, fill: &Color) -> Layer {
         Layer {
             id,
+            title: String::new(),
             opacity: 1.0,
             hidden: false,
             censored: false,
@@ -286,6 +288,7 @@ impl Layer {
         };
 
         Layer {
+            title: self.title.clone(),
             width: new_width,
             height: new_height,
             tiles: new_tiles,

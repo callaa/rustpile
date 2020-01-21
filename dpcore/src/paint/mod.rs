@@ -5,6 +5,7 @@ pub mod rasterop;
 pub mod rectiter;
 pub mod tile;
 pub mod tileiter;
+pub mod layerstack;
 
 pub type UserID = u8;
 pub type LayerID = i32;
@@ -13,7 +14,6 @@ pub type LayerID = i32;
 mod blendmode;
 mod brushmask;
 mod layer;
-mod layerstack;
 mod rect;
 
 pub use blendmode::Blendmode;

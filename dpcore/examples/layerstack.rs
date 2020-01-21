@@ -1,5 +1,6 @@
 use dpcore::paint::tile::Tile;
-use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer, LayerStack};
+use dpcore::paint::layerstack::{LayerStack, LayerInsertion, LayerFill};
+use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer};
 
 mod utils;
 
@@ -22,8 +23,8 @@ fn brush_stroke(layer: &mut Layer, y: i32, color: &Color) {
 fn main() {
     let mut layerstack = LayerStack::new(256, 256);
     layerstack.background = Tile::new_solid(&Color::rgb8(255, 255, 255), 0);
-    layerstack.add_layer(1, &Color::TRANSPARENT);
-    layerstack.add_layer(2, &Color::TRANSPARENT);
+    layerstack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
+    layerstack.add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top);
 
     layerstack.get_layer_mut(2).unwrap().opacity = 0.5;
 
