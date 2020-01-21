@@ -43,7 +43,7 @@ impl CanvasState {
             LayerCreate(_, m) => self.handle_layer_create(m),
             LayerAttributes(_, m) => self.handle_layer_attributes(m),
             LayerRetitle(_, m) => self.handle_layer_retitle(m),
-            LayerOrder(_, order) => todo!(),
+            LayerOrder(_, order) => self.handle_layer_order(order),
             LayerDelete(_, m) => todo!(),
             LayerVisibility(u, m) => todo!(),
             PutImage(u, m) => todo!(),
@@ -161,6 +161,11 @@ impl CanvasState {
         } else {
             warn!("LayerRetitle: Layer {:04x} not found!", msg.id);
         }
+    }
+
+    fn handle_layer_order(&mut self, new_order: &[u16]) {
+        let order: Vec<LayerID> = new_order.iter().map(|i| *i as LayerID).collect();
+        self.layerstack = Rc::new(self.layerstack.reordered(&order));
     }
 
     fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {

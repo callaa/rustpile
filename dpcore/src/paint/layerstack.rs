@@ -108,6 +108,31 @@ impl LayerStack {
         None
     }
 
+    /// Return a copy of the layerstack with the layers in the given order.
+    /// The new order vector is sanitized. Duplicate and nonexistent layers
+    /// are dropped and missing layers are appended.
+    pub fn reordered(&self, new_order: &[LayerID]) -> LayerStack {
+        let mut ordered = Vec::<Rc<Layer>>::new();
+        let mut oldorder = (*self.layers).clone();
+
+        // Take layers from the old list and add them in the specified order.
+        for &layer_id in new_order {
+            if let Some(pos) = oldorder.iter().position(|l| l.id == layer_id) {
+                ordered.push(oldorder.remove(pos));
+            }
+        }
+
+        // Add any remaining layers in the existing order
+        ordered.extend_from_slice(&oldorder);
+
+        LayerStack {
+            layers: Rc::new(ordered),
+            annotations: self.annotations.clone(),
+            background: self.background.clone(),
+            ..*self
+        }
+    }
+
     /// Flatten layer stack content
     pub fn flatten_tile(&self, i: u32, j: u32) -> TileData {
         let mut destination = self.background.clone_data();
@@ -241,6 +266,24 @@ mod tests {
         assert!(stack.get_layer(1).is_some());
         assert!(stack.get_layer(2).is_none());
         assert!(stack.get_layer(3).is_some());
+    }
+
+    #[test]
+    fn test_layer_reordering() {
+        let mut stack = LayerStack::new(64, 64);
+        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+        assert!(stack.add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+        assert!(stack.add_layer(3, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+        assert!(stack.add_layer(4, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+
+        // duplicates are silently dropped and missing layers appended in the original order
+        let new_order = [3,2,2,3];
+        let reordered = stack.reordered(&new_order);
+
+        assert_eq!(reordered.layers[0].id, 3);
+        assert_eq!(reordered.layers[1].id, 2);
+        assert_eq!(reordered.layers[2].id, 1);
+        assert_eq!(reordered.layers[3].id, 4);
     }
 
     #[test]
