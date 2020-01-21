@@ -44,7 +44,7 @@ impl CanvasState {
             LayerAttributes(_, m) => self.handle_layer_attributes(m),
             LayerRetitle(_, m) => self.handle_layer_retitle(m),
             LayerOrder(_, order) => self.handle_layer_order(order),
-            LayerDelete(_, m) => todo!(),
+            LayerDelete(_, m) => self.handle_layer_delete(m),
             LayerVisibility(u, m) => todo!(),
             PutImage(u, m) => todo!(),
             FillRect(user, m) => self.handle_fillrect(*user, m),
@@ -166,6 +166,21 @@ impl CanvasState {
     fn handle_layer_order(&mut self, new_order: &[u16]) {
         let order: Vec<LayerID> = new_order.iter().map(|i| *i as LayerID).collect();
         self.layerstack = Rc::new(self.layerstack.reordered(&order));
+    }
+
+    fn handle_layer_delete(&mut self, msg: &LayerDeleteMessage) {
+        let stack = Rc::make_mut(&mut self.layerstack);
+        let id = msg.id as LayerID;
+        if msg.merge {
+            if let Some(below) = stack.find_layer_below(id) {
+                let above = stack.get_layer_rc(id).unwrap();
+                editlayer::merge(stack.get_layer_mut(below).unwrap(), &above);
+            } else {
+                warn!("LayerDelete: Cannot merge {:04x}", id);
+                return;
+            }
+        }
+        stack.remove_layer(id);
     }
 
     fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {

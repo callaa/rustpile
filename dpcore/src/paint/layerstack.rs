@@ -48,7 +48,7 @@ impl LayerStack {
     ///
     /// If a layer with the given ID exists already, None will be returned.
     /// If fill is Copy and the source layer does not exist, None will be returned.
-    pub fn add_layer(&mut self, id: i32, fill: LayerFill, pos: LayerInsertion) -> Option<&mut Layer> {
+    pub fn add_layer(&mut self, id: LayerID, fill: LayerFill, pos: LayerInsertion) -> Option<&mut Layer> {
         if self.find_layer_index(id).is_some() {
             return None;
         }
@@ -73,8 +73,8 @@ impl LayerStack {
         Some(Rc::make_mut(layers.last_mut().unwrap()))
     }
 
-    /// Find a layer with the given ID
-    pub fn get_layer(&self, id: i32) -> Option<&Layer> {
+    /// Find a layer with the given ID and return a reference to it
+    pub fn get_layer(&self, id: LayerID) -> Option<&Layer> {
         for l in self.layers.iter() {
             if l.id == id {
                 return Some(l);
@@ -83,8 +83,18 @@ impl LayerStack {
         None
     }
 
+    /// Find a layer with the given ID and return a reference counted pointer to it
+    pub fn get_layer_rc(&self, id: LayerID) -> Option<Rc<Layer>> {
+        for l in self.layers.iter() {
+            if l.id == id {
+                return Some(l.clone());
+            }
+        }
+        None
+    }
+
     /// Find a layer with the given ID
-    pub fn get_layer_mut(&mut self, id: i32) -> Option<&mut Layer> {
+    pub fn get_layer_mut(&mut self, id: LayerID) -> Option<&mut Layer> {
         if let Some(idx) = self.find_layer_index(id) {
             Some(Rc::make_mut(&mut Rc::make_mut(&mut self.layers)[idx]))
         } else {
@@ -93,13 +103,23 @@ impl LayerStack {
     }
 
     /// Remove a layer with the given ID
-    pub fn remove_layer(&mut self, id: i32) {
+    pub fn remove_layer(&mut self, id: LayerID) {
         if let Some(idx) = self.find_layer_index(id) {
             Rc::make_mut(&mut self.layers).remove(idx);
         }
     }
 
-    fn find_layer_index(&self, id: i32) -> Option<usize> {
+    /// Find the ID of the layer below this layer
+    pub fn find_layer_below(&self, id: LayerID) -> Option<LayerID> {
+        if let Some(idx) = self.find_layer_index(id) {
+            if idx > 0 {
+                return Some(self.layers[idx - 1].id);
+            }
+        }
+        None
+    }
+
+    fn find_layer_index(&self, id: LayerID) -> Option<usize> {
         for (i, l) in self.layers.iter().enumerate() {
             if l.id == id {
                 return Some(i);
