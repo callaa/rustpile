@@ -16,6 +16,7 @@ pub struct CanvasState {
     layerstack: Rc<LayerStack>,
     history: History,
     brushcache: ClassicBrushCache,
+    local_user_id: UserID,
 }
 
 impl CanvasState {
@@ -24,6 +25,7 @@ impl CanvasState {
             layerstack: Rc::new(LayerStack::new(0, 0)),
             history: History::new(),
             brushcache: ClassicBrushCache::new(),
+            local_user_id: 0,
         }
     }
 
@@ -45,7 +47,7 @@ impl CanvasState {
             LayerRetitle(_, m) => self.handle_layer_retitle(m),
             LayerOrder(_, order) => self.handle_layer_order(order),
             LayerDelete(_, m) => self.handle_layer_delete(m),
-            LayerVisibility(u, m) => todo!(),
+            LayerVisibility(u, m) => self.handle_layer_visibility(*u, m),
             PutImage(u, m) => todo!(),
             FillRect(user, m) => self.handle_fillrect(*user, m),
             PenUp(user) => self.handle_penup(*user),
@@ -181,6 +183,14 @@ impl CanvasState {
             }
         }
         stack.remove_layer(id);
+    }
+
+    fn handle_layer_visibility(&mut self, user: UserID, msg: &LayerVisibilityMessage) {
+        if user == self.local_user_id {
+            if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID) {
+                layer.hidden = !msg.visible;
+            }
+        }
     }
 
     fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {
