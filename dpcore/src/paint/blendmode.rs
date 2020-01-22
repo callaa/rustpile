@@ -30,12 +30,14 @@ impl Blendmode {
 
     pub fn can_increase_opacity(self) -> bool {
         match self {
-            Blendmode::Normal | Blendmode::Recolor | Blendmode::Behind | Blendmode::Replace => true,
+            Blendmode::Normal | Blendmode::Behind | Blendmode::Replace => true,
             _ => false,
         }
     }
 }
 
 impl Default for Blendmode {
-    fn default() -> Self { Blendmode::Normal }
+    fn default() -> Self {
+        Blendmode::Normal
+    }
 }

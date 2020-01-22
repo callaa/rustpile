@@ -38,10 +38,13 @@ pub fn fill_rect(
     };
 
     let pixels = [color.as_pixel(); TILE_SIZE as usize];
+    let can_paint = mode.can_increase_opacity();
+    let can_erase = mode.can_decrease_opacity();
 
     for (i, j, tile) in layer.tile_rect_mut(&r) {
-        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
-        // flag, then this tile can be skipped.
+        if !can_paint && *tile == Tile::Blank {
+            continue;
+        }
 
         let x = i * TILE_SIZEI;
         let y = j * TILE_SIZEI;
@@ -49,7 +52,7 @@ pub fn fill_rect(
             .intersected(&r)
             .unwrap()
             .offset(-x, -y);
-        for row in tile.rect_iter_mut(user, &subrect) {
+        for row in tile.rect_iter_mut(user, &subrect, can_erase) {
             rasterop::pixel_blend(row, &pixels, 0xff, mode);
         }
     }
@@ -87,10 +90,13 @@ pub fn draw_brush_dab(
     };
 
     let colorpix = color.as_pixel();
+    let can_paint = mode.can_increase_opacity();
+    let can_erase = mode.can_decrease_opacity();
 
     for (i, j, tile) in layer.tile_rect_mut(&rect) {
-        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
-        // flag, then this tile can be skipped.
+        if !can_paint && *tile == Tile::Blank {
+            continue;
+        }
 
         let x0 = i * TILE_SIZEI;
         let y0 = j * TILE_SIZEI;
@@ -101,7 +107,7 @@ pub fn draw_brush_dab(
         let maskrect = rect.intersected(&subrect).unwrap().offset(-x, -y);
 
         for (destrow, maskrow) in
-            tile.rect_iter_mut(user, &tilerect)
+            tile.rect_iter_mut(user, &tilerect, can_erase)
                 .zip(RectIterator::from_rectangle(
                     &mask.mask,
                     mask.diameter as usize,
@@ -136,10 +142,13 @@ pub fn draw_image(
     };
 
     let o = (opacity * 255.0) as u8;
+    let can_paint = blendmode.can_increase_opacity();
+    let can_erase = blendmode.can_decrease_opacity();
 
     for (i, j, tile) in layer.tile_rect_mut(&destrect) {
-        // TODO if this is a Blank tile and blendmode does not have the "can increase opacity"
-        // flag, then this tile can be skipped.
+        if !can_paint && *tile == Tile::Blank {
+            continue;
+        }
 
         let x0 = i * TILE_SIZEI;
         let y0 = j * TILE_SIZEI;
@@ -150,7 +159,7 @@ pub fn draw_image(
         let srcrect = rect.intersected(&subrect).unwrap().offset(-rect.x, -rect.y);
 
         for (destrow, imagerow) in
-            tile.rect_iter_mut(user, &tilerect)
+            tile.rect_iter_mut(user, &tilerect, can_erase)
                 .zip(RectIterator::from_rectangle(
                     &image,
                     rect.w as usize,

@@ -25,6 +25,11 @@ pub fn drawdabs_classic(
         color.a = 1.0; // needed because as_pixel returns premultiplied pixel values
         drawdabs_classic_draw(layer, user, color, mode, &dabs, cache);
     }
+
+    if mode.can_decrease_opacity() {
+        layer.optimize();
+    }
+
     // TODO return AoE
 }
 
@@ -72,6 +77,11 @@ pub fn drawdabs_pixel(layer: &mut Layer, user: UserID, dabs: &DrawDabsPixelMessa
         color.a = 1.0; // needed because as_pixel returns premultiplied pixel values
         drawdabs_pixel_draw(layer, user, color, mode, &dabs, square);
     }
+
+    if mode.can_decrease_opacity() {
+        layer.optimize();
+    }
+
     // TODO return AoE
 }
 

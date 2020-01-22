@@ -76,7 +76,7 @@ impl Layer {
                 let destrect =
                     srcrect.offset(-((tx * TILE_SIZE) as i32), -((ty * TILE_SIZE) as i32));
 
-                let tile = tilevec[(ty * xtiles + tx) as usize].rect_iter_mut(0, &destrect);
+                let tile = tilevec[(ty * xtiles + tx) as usize].rect_iter_mut(0, &destrect, true);
                 let src = RectIterator::from_rectangle(pixels, width as usize, &srcrect);
 
                 for (destrow, srcrow) in tile.zip(src) {
@@ -85,6 +85,7 @@ impl Layer {
             }
         }
 
+        layer.optimize();
         layer
     }
 
@@ -262,6 +263,16 @@ impl Layer {
         }
     }
 
+    /// Call optimize on every tile on this layer.
+    /// This will release memory and speed up rendering, as blank
+    /// tiles can be skipped.
+    /// TODO this should take an AoE parameter to limit which tiles to look at
+    pub fn optimize(&mut self) {
+        Rc::make_mut(&mut self.tiles)
+            .iter_mut()
+            .for_each(|t| t.optimize());
+    }
+
     /// Return a new layer with the size adjusted by the given values
     ///
     /// The new layer will contain the same content as this one, but offset and possibly cropped.
@@ -356,7 +367,7 @@ impl Layer {
                     let source_tile_rect = subrect.offset(-target_rect.x, -target_rect.y);
 
                     dest_tile
-                        .rect_iter_mut(tile.last_touched_by(), &dest_tile_rect)
+                        .rect_iter_mut(tile.last_touched_by(), &dest_tile_rect, true)
                         .zip(tile.rect_iter(&source_tile_rect))
                         .for_each(|(d, s)| d.clone_from_slice(s));
                 }
@@ -465,7 +476,7 @@ mod tests {
         // Change a pixel so the whole layer won't be of uniform color
         layer
             .tile_mut(0, 0)
-            .rect_iter_mut(0, &Rectangle::new(1, 1, 1, 1))
+            .rect_iter_mut(0, &Rectangle::new(1, 1, 1, 1), false)
             .next()
             .unwrap()[0] = WHITE_PIXEL;
 
@@ -507,7 +518,7 @@ mod tests {
             for x in 0..3 {
                 layer
                     .tile_mut(x, y)
-                    .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
+                    .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1), false)
                     .next()
                     .unwrap()[0] = WHITE_PIXEL;
             }
@@ -532,7 +543,7 @@ mod tests {
         let mut layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &Color::rgb8(0, 0, 0));
         layer
             .tile_mut(0, 0)
-            .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1))
+            .rect_iter_mut(0, &Rectangle::new(0, 0, 1, 1), false)
             .next()
             .unwrap()[0] = WHITE_PIXEL;
 
@@ -550,7 +561,7 @@ mod tests {
         let mut layer = Layer::new(0, TILE_SIZE, TILE_SIZE, &Color::TRANSPARENT);
         layer
             .tile_mut(0, 0)
-            .rect_iter_mut(0, &Rectangle::new(5, 10, 1, 1))
+            .rect_iter_mut(0, &Rectangle::new(5, 10, 1, 1), false)
             .next()
             .unwrap()[0] = WHITE_PIXEL;
 

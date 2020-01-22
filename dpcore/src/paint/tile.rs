@@ -11,8 +11,17 @@ pub const TILE_LENGTH: usize = (TILE_SIZE * TILE_SIZE) as usize;
 
 #[derive(Clone)]
 pub struct TileData {
+    /// The pixel content
     pub pixels: [Pixel; TILE_LENGTH],
+
+    /// ID of the user who last touched this tile
     pub last_touched_by: UserID,
+
+    /// This tile has been touched by an operation that can decrease
+    /// pixel opacity since the last time optimize() was called.
+	/// May be eligible for turning into a Tile::Blank.
+    /// Setting this to true is always safe and should be done if in doubt.
+    maybe_blank: bool,
 }
 
 #[derive(Clone)]
@@ -24,6 +33,7 @@ pub enum Tile {
 static TRANSPARENT_DATA: TileData = TileData {
     pixels: [ZERO_PIXEL; TILE_LENGTH],
     last_touched_by: 0,
+    maybe_blank: true,
 };
 
 impl TileData {
@@ -31,6 +41,7 @@ impl TileData {
         TileData {
             pixels: [pixel; TILE_LENGTH],
             last_touched_by: user,
+            maybe_blank: pixel == ZERO_PIXEL,
         }
     }
 
@@ -41,6 +52,7 @@ impl TileData {
             (opacity * 255.0) as u8,
             mode,
         );
+        self.maybe_blank = mode.can_decrease_opacity();
     }
 
     pub fn merge_tile(&mut self, other: &Tile, opacity: f32, mode: Blendmode) {
@@ -102,11 +114,29 @@ impl Tile {
         }
     }
 
-    /// Check if all pixels of this tile are fully transparent
+    /// Check if all pixels of this tile are fully transparent.
+    /// Shortcircuits if maybe_blank is false.
     pub fn is_blank(&self) -> bool {
         match self {
-            Tile::Bitmap(td) => td.pixels.iter().all(|&p| p[ALPHA_CHANNEL] == 0),
+            Tile::Bitmap(td) => td.maybe_blank && td.pixels.iter().all(|&p| p[ALPHA_CHANNEL] == 0),
             Tile::Blank => true,
+        }
+    }
+
+    /// Convert this to a Tile::Blank tile if it's blank.
+    /// The maybe_blank flag is cleared if the tile isn't really blank.
+    pub fn optimize(&mut self) {
+        match self {
+            Tile::Bitmap(td) => {
+                if td.maybe_blank {
+                    if td.pixels.iter().all(|&p| p[ALPHA_CHANNEL] == 0) {
+                        *self = Tile::Blank;
+                    } else {
+                        Rc::make_mut(td).maybe_blank = false;
+                    }
+                }
+            }
+            Tile::Blank => (),
         }
     }
 
@@ -128,6 +158,7 @@ impl Tile {
                     let pixel = color.as_pixel();
                     let data = Rc::make_mut(td);
                     data.last_touched_by = user;
+                    data.maybe_blank = false;
                     for i in data.pixels.iter_mut() {
                         *i = pixel;
                     }
@@ -145,10 +176,13 @@ impl Tile {
             match self {
                 Tile::Bitmap(td) => Rc::make_mut(td).merge_data(o, opacity, mode),
                 Tile::Blank => {
-                    // TODO optimization: in certain cases we can just replace this tile with other
                     if mode.can_increase_opacity() {
-                        *self = Tile::new_solid(&Color::TRANSPARENT, other.last_touched_by());
-                        self.merge(other, opacity, mode);
+                        if opacity == 1.0 {
+                            *self = other.clone();
+                        } else {
+                            *self = Tile::new_solid(&Color::TRANSPARENT, other.last_touched_by());
+                            self.merge(other, opacity, mode);
+                        }
                     }
                 }
             }
@@ -169,20 +203,28 @@ impl Tile {
         }
     }
 
-    // Return a mutable iterator to this tile's content
-    // If this is a Blank tile, it is converted to a fully transparent Bitmap tile first.
-    pub fn rect_iter_mut(&mut self, user: UserID, r: &Rectangle) -> MutableRectIterator<Pixel> {
+    /// Return a mutable iterator to this tile's content
+    /// If this is a Blank tile, it is converted to a fully transparent Bitmap tile first.
+    /// If you intend to apply any operation that can decrease pixel opacity, set maybe_erase to
+    /// true. Otherwise, is_blank may return false even if the tile is actually transparent.
+    pub fn rect_iter_mut(
+        &mut self,
+        user: UserID,
+        r: &Rectangle,
+        maybe_erase: bool,
+    ) -> MutableRectIterator<Pixel> {
         debug_assert!(r.x >= 0 && r.y >= 0);
         debug_assert!(r.right() < TILE_SIZEI && r.bottom() < TILE_SIZEI);
 
         match self {
             Tile::Bitmap(td) => {
                 let data = Rc::make_mut(td);
+                data.maybe_blank |= maybe_erase;
                 MutableRectIterator::from_rectangle(&mut data.pixels, TILE_SIZE as usize, r)
             }
             Tile::Blank => {
                 *self = Tile::new_solid(&Color::TRANSPARENT, user);
-                self.rect_iter_mut(user, r)
+                self.rect_iter_mut(user, r, true)
             }
         }
     }
@@ -311,7 +353,7 @@ mod tests {
         assert_eq!(tile.solid_color(), Some(red));
         assert!(!tile.is_blank());
 
-        tile.rect_iter_mut(1, &Rectangle::new(0, 0, 3, 3))
+        tile.rect_iter_mut(1, &Rectangle::new(0, 0, 3, 3), false)
             .flatten()
             .for_each(|p| *p = WHITE_PIXEL);
         assert_eq!(tile.solid_color(), None);

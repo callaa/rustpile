@@ -1,11 +1,9 @@
 use super::brushes;
-use super::history::History;
 use super::compression;
+use super::history::History;
+use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
 use crate::paint::tile::Tile;
-use crate::paint::layerstack::{LayerStack, LayerInsertion, LayerFill};
-use crate::paint::{
-    editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID,
-};
+use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID};
 use crate::protocol::message::*;
 
 use std::convert::{TryFrom, TryInto};
@@ -105,7 +103,9 @@ impl CanvasState {
         Rc::make_mut(&mut self.layerstack)
             .iter_layers_mut()
             .filter(|l| l.has_sublayer(sublayer_id)) // avoid unnecessary clones
-            .for_each(|l| { editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id); });
+            .for_each(|l| {
+                editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id);
+            });
     }
 
     fn handle_canvas_resize(&mut self, msg: &CanvasResizeMessage) {
@@ -120,7 +120,10 @@ impl CanvasState {
     }
 
     fn handle_layer_create(&mut self, msg: &LayerCreateMessage) {
-        let pos = match (msg.flags & LayerCreateMessage::FLAGS_INSERT != 0, msg.source) {
+        let pos = match (
+            msg.flags & LayerCreateMessage::FLAGS_INSERT != 0,
+            msg.source,
+        ) {
             (true, 0) => LayerInsertion::Bottom,
             (true, source) => LayerInsertion::Above(source as LayerID),
             (false, _) => LayerInsertion::Top,
@@ -132,10 +135,10 @@ impl CanvasState {
             LayerFill::Solid(Color::from_argb32(msg.fill))
         };
 
-        if let Some(layer) = Rc::make_mut(&mut self.layerstack)
-            .add_layer(msg.id as LayerID, fill, pos) {
+        if let Some(layer) =
+            Rc::make_mut(&mut self.layerstack).add_layer(msg.id as LayerID, fill, pos)
+        {
             layer.title = msg.name.clone();
-
         } else {
             // todo add_layer could return Result instead with a better error message
             warn!("LayerCreate: layer {:04x} could not be created", msg.id);
@@ -187,7 +190,8 @@ impl CanvasState {
 
     fn handle_layer_visibility(&mut self, user: UserID, msg: &LayerVisibilityMessage) {
         if user == self.local_user_id {
-            if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID) {
+            if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID)
+            {
                 layer.hidden = !msg.visible;
             }
         }
@@ -212,7 +216,8 @@ impl CanvasState {
     }
 
     fn handle_putimage(&mut self, user_id: UserID, msg: &PutImageMessage) {
-        if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID) {
+        if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
+        {
             if msg.w == 0 || msg.h == 0 {
                 warn!("PutImage: zero size!");
                 return;
@@ -221,15 +226,22 @@ impl CanvasState {
                 warn!("PutImage: oversize image! ({}, {})", msg.w, msg.h);
                 return;
             }
-            if let Some(imagedata) = compression::decompress_image(&msg.image, (msg.w * msg.h) as usize) {
+            if let Some(imagedata) =
+                compression::decompress_image(&msg.image, (msg.w * msg.h) as usize)
+            {
+                let mode = Blendmode::try_from(msg.mode).unwrap_or_default();
                 editlayer::draw_image(
                     layer,
                     user_id,
                     &imagedata,
                     &Rectangle::new(msg.x as i32, msg.y as i32, msg.w as i32, msg.h as i32),
                     1.0,
-                    Blendmode::try_from(msg.mode).unwrap_or_default(),
+                    mode,
                 );
+
+                if mode.can_decrease_opacity() {
+                    layer.optimize();
+                }
             }
         } else {
             warn!("PutImage: Layer {:04x} not found!", msg.layer);
@@ -255,13 +267,18 @@ impl CanvasState {
 
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
+            let mode = Blendmode::try_from(msg.mode).unwrap_or_default();
             editlayer::fill_rect(
                 layer,
                 user,
                 &Color::from_argb32(msg.color),
-                Blendmode::try_from(msg.mode).unwrap_or_default(),
+                mode,
                 &Rectangle::new(msg.x as i32, msg.y as i32, msg.w as i32, msg.h as i32),
             );
+
+            if mode.can_decrease_opacity() {
+                layer.optimize();
+            }
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
         }
