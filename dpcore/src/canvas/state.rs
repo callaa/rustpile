@@ -3,11 +3,10 @@ use super::compression;
 use super::history::History;
 use crate::paint::annotation::{AnnotationID, VAlign};
 use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
-use crate::paint::tile::Tile;
 use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID};
 use crate::protocol::message::*;
 
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 use std::rc::Rc;
 use tracing::warn;
 
@@ -280,14 +279,9 @@ impl CanvasState {
     }
 
     fn handle_background(&mut self, pixels: &[u8]) {
-        let tile = if pixels.len() == 4 {
-            let color = Color::from_argb32(u32::from_be_bytes(pixels[..].try_into().unwrap()));
-            Tile::new(&color, 0)
-        } else {
-            todo!()
-        };
-
-        Rc::make_mut(&mut self.layerstack).background = tile;
+        if let Some(tile) = compression::decompress_tile(pixels, 0) {
+            Rc::make_mut(&mut self.layerstack).background = tile;
+        }
     }
 
     fn handle_fillrect(&mut self, user: UserID, msg: &FillRectMessage) {
