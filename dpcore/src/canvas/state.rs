@@ -53,7 +53,6 @@ impl CanvasState {
             AnnotationReshape(_, m) => todo!(),
             AnnotationEdit(_, m) => todo!(),
             AnnotationDelete(_, m) => todo!(),
-            MoveRegion(_, _) => unimplemented!(),
             PutTile(user, m) => self.handle_puttile(*user, m),
             CanvasBackground(_, m) => self.handle_background(m),
             DrawDabsClassic(user, m) => self.handle_drawdabs_classic(*user, m),

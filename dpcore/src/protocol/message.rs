@@ -913,118 +913,6 @@ impl AnnotationEditMessage {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MoveRegionMessage {
-    pub layer: u16,
-    pub bx: i32,
-    pub by: i32,
-    pub bw: i32,
-    pub bh: i32,
-    pub x1: i32,
-    pub y1: i32,
-    pub x2: i32,
-    pub y2: i32,
-    pub x3: i32,
-    pub y3: i32,
-    pub x4: i32,
-    pub y4: i32,
-    pub mask: Vec<u8>,
-}
-
-impl MoveRegionMessage {
-    fn deserialize(buf: &[u8]) -> Result<Self, DeserializationError> {
-        let mut reader = MessageReader::new(buf).check_len(50, 65535, 145, 0)?;
-
-        let layer = reader.read::<u16>();
-        let bx = reader.read::<i32>();
-        let by = reader.read::<i32>();
-        let bw = reader.read::<i32>();
-        let bh = reader.read::<i32>();
-        let x1 = reader.read::<i32>();
-        let y1 = reader.read::<i32>();
-        let x2 = reader.read::<i32>();
-        let y2 = reader.read::<i32>();
-        let x3 = reader.read::<i32>();
-        let y3 = reader.read::<i32>();
-        let x4 = reader.read::<i32>();
-        let y4 = reader.read::<i32>();
-        let mask = reader.read_remaining_vec::<u8>();
-
-        Ok(Self {
-            layer,
-            bx,
-            by,
-            bw,
-            bh,
-            x1,
-            y1,
-            x2,
-            y2,
-            x3,
-            y3,
-            x4,
-            y4,
-            mask,
-        })
-    }
-
-    fn serialize(&self, user_id: u8) -> Vec<u8> {
-        let mut w = MessageWriter::with_expected_payload(145, user_id, 50 + self.mask.len());
-        w.write(self.layer);
-        w.write(self.bx);
-        w.write(self.by);
-        w.write(self.bw);
-        w.write(self.bh);
-        w.write(self.x1);
-        w.write(self.y1);
-        w.write(self.x2);
-        w.write(self.y2);
-        w.write(self.x3);
-        w.write(self.y3);
-        w.write(self.x4);
-        w.write(self.y4);
-        w.write(&self.mask);
-
-        w.into()
-    }
-
-    fn to_text(&self, txt: TextMessage) -> TextMessage {
-        txt.set("layer", format!("0x{:04x}", self.layer))
-            .set("bx", self.bx.to_string())
-            .set("by", self.by.to_string())
-            .set("bw", self.bw.to_string())
-            .set("bh", self.bh.to_string())
-            .set("x1", self.x1.to_string())
-            .set("y1", self.y1.to_string())
-            .set("x2", self.x2.to_string())
-            .set("y2", self.y2.to_string())
-            .set("x3", self.x3.to_string())
-            .set("y3", self.y3.to_string())
-            .set("x4", self.x4.to_string())
-            .set("y4", self.y4.to_string())
-            .set_bytes("mask", &self.mask)
-    }
-
-    fn from_text(tm: &TextMessage) -> Self {
-        Self {
-            layer: tm.get_u16("layer"),
-            bx: i32::from_str(tm.get_str("bx")).unwrap_or_default(),
-            by: i32::from_str(tm.get_str("by")).unwrap_or_default(),
-            bw: i32::from_str(tm.get_str("bw")).unwrap_or_default(),
-            bh: i32::from_str(tm.get_str("bh")).unwrap_or_default(),
-            x1: i32::from_str(tm.get_str("x1")).unwrap_or_default(),
-            y1: i32::from_str(tm.get_str("y1")).unwrap_or_default(),
-            x2: i32::from_str(tm.get_str("x2")).unwrap_or_default(),
-            y2: i32::from_str(tm.get_str("y2")).unwrap_or_default(),
-            x3: i32::from_str(tm.get_str("x3")).unwrap_or_default(),
-            y3: i32::from_str(tm.get_str("y3")).unwrap_or_default(),
-            x4: i32::from_str(tm.get_str("x4")).unwrap_or_default(),
-            y4: i32::from_str(tm.get_str("y4")).unwrap_or_default(),
-            mask: tm.get_bytes("mask"),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
 pub struct PutTileMessage {
     pub layer: u16,
     pub sublayer: u8,
@@ -1694,26 +1582,6 @@ pub enum CommandMessage {
     ///
     AnnotationDelete(u8, u16),
 
-    /// Move (and transform) a region of a layer.
-    ///
-    /// This is used to implement selection moving. It is equivalent
-    /// to doing two PutImages: the first to mask away the original
-    /// selection and the other to paste the selection to a new location.
-    /// This command packages that into a single action that is more
-    /// bandwidth efficient and can be used even when PutImages in general
-    /// are locked, since it's not introducing any new pixels onto the canvas.
-    /// Internally, the paint engine performs the following steps:
-    ///
-    /// 1. Copy selected pixels to a buffer
-    /// 2. Erase selected pixels from the layer
-    /// 3. Composite transformed buffer onto the layer.
-    ///
-    /// The pixel selection is determined by the mask bitmap. The mask
-    /// is DEFLATEd 1 bit per pixel bitmap data.
-    /// For axis aligned rectangle selections, no bitmap is necessary.
-    ///
-    MoveRegion(u8, MoveRegionMessage),
-
     /// Set the content of a tile
     ///
     /// Unlike PutImage, this replaces an entire tile directly without any blending.
@@ -1946,7 +1814,6 @@ impl CommandMessage {
             AnnotationReshape(user_id, b) => b.serialize(*user_id),
             AnnotationEdit(user_id, b) => b.serialize(*user_id),
             AnnotationDelete(user_id, b) => MessageWriter::single(144, *user_id, *b),
-            MoveRegion(user_id, b) => b.serialize(*user_id),
             PutTile(user_id, b) => b.serialize(*user_id),
             CanvasBackground(user_id, b) => MessageWriter::single(147, *user_id, b),
             DrawDabsClassic(user_id, b) => b.serialize(*user_id),
@@ -1980,7 +1847,6 @@ impl CommandMessage {
             AnnotationDelete(user_id, b) => {
                 TextMessage::new(*user_id, "deleteannotation").set("id", format!("0x{:04x}", b))
             }
-            MoveRegion(user_id, b) => b.to_text(TextMessage::new(*user_id, "moveregion")),
             PutTile(user_id, b) => b.to_text(TextMessage::new(*user_id, "puttile")),
             CanvasBackground(user_id, b) => {
                 TextMessage::new(*user_id, "background").set_bytes("image", &b)
@@ -2012,7 +1878,6 @@ impl CommandMessage {
             AnnotationReshape(user_id, _) => *user_id,
             AnnotationEdit(user_id, _) => *user_id,
             AnnotationDelete(user_id, _) => *user_id,
-            MoveRegion(user_id, _) => *user_id,
             PutTile(user_id, _) => *user_id,
             CanvasBackground(user_id, _) => *user_id,
             DrawDabsClassic(user_id, _) => *user_id,
@@ -2202,10 +2067,6 @@ impl Message {
                     .check_len(2, 2, 144, 0)?
                     .read::<u16>(),
             )),
-            145 => Command(CommandMessage::MoveRegion(
-                user_id,
-                MoveRegionMessage::deserialize(&buf)?,
-            )),
             146 => Command(CommandMessage::PutTile(
                 user_id,
                 PutTileMessage::deserialize(&buf)?,
@@ -2375,10 +2236,6 @@ impl Message {
             "deleteannotation" => Command(CommandMessage::AnnotationDelete(
                 tm.user_id,
                 tm.get_u16("id"),
-            )),
-            "moveregion" => Command(CommandMessage::MoveRegion(
-                tm.user_id,
-                MoveRegionMessage::from_text(&tm),
             )),
             "puttile" => Command(CommandMessage::PutTile(
                 tm.user_id,
