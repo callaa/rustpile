@@ -19,7 +19,7 @@ pub struct TileData {
 
     /// This tile has been touched by an operation that can decrease
     /// pixel opacity since the last time optimize() was called.
-	/// May be eligible for turning into a Tile::Blank.
+    /// May be eligible for turning into a Tile::Blank.
     /// Setting this to true is always safe and should be done if in doubt.
     maybe_blank: bool,
 }

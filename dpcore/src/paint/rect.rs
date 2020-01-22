@@ -1,6 +1,6 @@
 use core::cmp::{max, min};
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone, Copy)]
 pub struct Rectangle {
     pub x: i32,
     pub y: i32,

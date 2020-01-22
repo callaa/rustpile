@@ -1,6 +1,6 @@
 mod brushes;
+mod compression;
 mod history;
 mod state;
-mod compression;
 
 pub use state::CanvasState;

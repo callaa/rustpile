@@ -1,9 +1,9 @@
 use std::rc::Rc;
 
-use super::annotation::Annotation;
+use super::annotation::{Annotation, AnnotationID, VAlign};
 use super::color::{Color, Pixel, ZERO_PIXEL};
 use super::tile::{Tile, TileData, TILE_SIZE};
-use super::{Layer, LayerID};
+use super::{Layer, LayerID, Rectangle};
 
 #[derive(Clone)]
 pub struct LayerStack {
@@ -48,7 +48,12 @@ impl LayerStack {
     ///
     /// If a layer with the given ID exists already, None will be returned.
     /// If fill is Copy and the source layer does not exist, None will be returned.
-    pub fn add_layer(&mut self, id: LayerID, fill: LayerFill, pos: LayerInsertion) -> Option<&mut Layer> {
+    pub fn add_layer(
+        &mut self,
+        id: LayerID,
+        fill: LayerFill,
+        pos: LayerInsertion,
+    ) -> Option<&mut Layer> {
         if self.find_layer_index(id).is_some() {
             return None;
         }
@@ -120,12 +125,7 @@ impl LayerStack {
     }
 
     fn find_layer_index(&self, id: LayerID) -> Option<usize> {
-        for (i, l) in self.layers.iter().enumerate() {
-            if l.id == id {
-                return Some(i);
-            }
-        }
-        None
+        self.layers.iter().position(|l| l.id == id)
     }
 
     /// Return a copy of the layerstack with the layers in the given order.
@@ -151,6 +151,45 @@ impl LayerStack {
             background: self.background.clone(),
             ..*self
         }
+    }
+
+    /// Create a new (blank) annotation
+    pub fn add_annotation(&mut self, id: AnnotationID, rect: Rectangle) {
+        if self.find_annotation_index(id).is_some() {
+            return;
+        }
+        Rc::make_mut(&mut self.annotations).push(Rc::new(Annotation {
+            id,
+            text: String::new(),
+            rect: rect,
+            background: Color::TRANSPARENT,
+            protect: false,
+            valign: VAlign::Top,
+        }));
+    }
+
+    pub fn remove_annotation(&mut self, id: AnnotationID) {
+        Rc::make_mut(&mut self.annotations).retain(|a| a.id != id);
+    }
+
+    pub fn get_annotation(&self, id: AnnotationID) -> Option<&Annotation> {
+        if let Some(idx) = self.find_annotation_index(id) {
+            Some(&self.annotations[idx])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_annotation_mut(&mut self, id: AnnotationID) -> Option<&mut Annotation> {
+        if let Some(idx) = self.find_annotation_index(id) {
+            Some(Rc::make_mut(&mut Rc::make_mut(&mut self.annotations)[idx]))
+        } else {
+            None
+        }
+    }
+
+    fn find_annotation_index(&self, id: AnnotationID) -> Option<usize> {
+        self.annotations.iter().position(|a| a.id == id)
     }
 
     /// Flatten layer stack content
@@ -228,12 +267,12 @@ impl LayerStack {
         })
     }
 
-    pub fn iter_layers(&self) -> impl Iterator<Item=&Layer> {
-        return self.layers.iter().map(|l| l.as_ref())
+    pub fn iter_layers(&self) -> impl Iterator<Item = &Layer> {
+        return self.layers.iter().map(|l| l.as_ref());
     }
 
-    pub fn iter_layers_mut(&mut self) -> impl Iterator<Item=&mut Rc<Layer>> {
-        return Rc::make_mut(&mut self.layers).iter_mut()
+    pub fn iter_layers_mut(&mut self) -> impl Iterator<Item = &mut Rc<Layer>> {
+        return Rc::make_mut(&mut self.layers).iter_mut();
     }
 }
 
@@ -244,25 +283,55 @@ mod tests {
     #[test]
     fn test_layer_addition() {
         let mut stack = LayerStack::new(256, 256);
-        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+        assert!(stack
+            .add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_some());
 
         // Adding a layer with an existing ID does nothing
-        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_none());
+        assert!(stack
+            .add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_none());
 
         // One more layer on top
-        assert!(stack.add_layer(2, LayerFill::Solid(Color::rgb8(255, 0, 0)), LayerInsertion::Top).is_some());
+        assert!(stack
+            .add_layer(
+                2,
+                LayerFill::Solid(Color::rgb8(255, 0, 0)),
+                LayerInsertion::Top
+            )
+            .is_some());
 
         // Duplicate layer on top
-        assert!(stack.add_layer(3, LayerFill::Copy(1), LayerInsertion::Top).is_some());
+        assert!(stack
+            .add_layer(3, LayerFill::Copy(1), LayerInsertion::Top)
+            .is_some());
 
         // Insert layer above the bottom-most
-        assert!(stack.add_layer(4, LayerFill::Solid(Color::rgb8(0, 255, 0)), LayerInsertion::Above(1)).is_some());
+        assert!(stack
+            .add_layer(
+                4,
+                LayerFill::Solid(Color::rgb8(0, 255, 0)),
+                LayerInsertion::Above(1)
+            )
+            .is_some());
 
         // Insert layer at the bottom
-        assert!(stack.add_layer(5, LayerFill::Solid(Color::rgb8(0, 0, 255)), LayerInsertion::Bottom).is_some());
+        assert!(stack
+            .add_layer(
+                5,
+                LayerFill::Solid(Color::rgb8(0, 0, 255)),
+                LayerInsertion::Bottom
+            )
+            .is_some());
 
         // Insert layer above the topmost
-        assert!(stack.add_layer(6, LayerFill::Solid(Color::rgb8(0, 0, 255)), LayerInsertion::Above(3)).is_some());
+        assert!(stack
+            .add_layer(
+                6,
+                LayerFill::Solid(Color::rgb8(0, 0, 255)),
+                LayerInsertion::Above(3)
+            )
+            .is_some());
 
         assert!(stack.get_layer(0).is_none());
         assert_eq!(stack.layers[0].id, 5);
@@ -291,13 +360,21 @@ mod tests {
     #[test]
     fn test_layer_reordering() {
         let mut stack = LayerStack::new(64, 64);
-        assert!(stack.add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
-        assert!(stack.add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
-        assert!(stack.add_layer(3, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
-        assert!(stack.add_layer(4, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top).is_some());
+        assert!(stack
+            .add_layer(1, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_some());
+        assert!(stack
+            .add_layer(2, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_some());
+        assert!(stack
+            .add_layer(3, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_some());
+        assert!(stack
+            .add_layer(4, LayerFill::Solid(Color::TRANSPARENT), LayerInsertion::Top)
+            .is_some());
 
         // duplicates are silently dropped and missing layers appended in the original order
-        let new_order = [3,2,2,3];
+        let new_order = [3, 2, 2, 3];
         let reordered = stack.reordered(&new_order);
 
         assert_eq!(reordered.layers[0].id, 3);

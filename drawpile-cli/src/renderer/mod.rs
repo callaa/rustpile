@@ -86,7 +86,6 @@ pub fn render_recording(opts: &RenderOpts) -> Result<(), Box<dyn std::error::Err
 fn save_image(filename: &str, image: &[Pixel], width: u32, height: u32) -> io::Result<()> {
     assert_eq!(image.len(), width as usize * height as usize);
 
-
     let mut rgba = Vec::<u8>::with_capacity(width as usize * height as usize * 4);
     for px in image.iter() {
         rgba.push(px[RED_CHANNEL]);

@@ -1,6 +1,7 @@
 use super::brushes;
 use super::compression;
 use super::history::History;
+use crate::paint::annotation::{AnnotationID, VAlign};
 use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
 use crate::paint::tile::Tile;
 use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID};
@@ -49,10 +50,10 @@ impl CanvasState {
             PutImage(u, m) => self.handle_putimage(*u, m),
             FillRect(user, m) => self.handle_fillrect(*user, m),
             PenUp(user) => self.handle_penup(*user),
-            AnnotationCreate(_, m) => todo!(),
-            AnnotationReshape(_, m) => todo!(),
-            AnnotationEdit(_, m) => todo!(),
-            AnnotationDelete(_, m) => todo!(),
+            AnnotationCreate(_, m) => self.handle_annotation_create(m),
+            AnnotationReshape(_, m) => self.handle_annotation_reshape(m),
+            AnnotationEdit(_, m) => self.handle_annotation_edit(m),
+            AnnotationDelete(_, id) => self.handle_annotation_delete(*id),
             PutTile(user, m) => self.handle_puttile(*user, m),
             CanvasBackground(_, m) => self.handle_background(m),
             DrawDabsClassic(user, m) => self.handle_drawdabs_classic(*user, m),
@@ -194,6 +195,37 @@ impl CanvasState {
                 layer.hidden = !msg.visible;
             }
         }
+    }
+
+    fn handle_annotation_create(&mut self, msg: &AnnotationCreateMessage) {
+        Rc::make_mut(&mut self.layerstack).add_annotation(
+            msg.id,
+            Rectangle::new(msg.x, msg.y, msg.w.max(1) as i32, msg.h.max(1) as i32),
+        );
+    }
+
+    fn handle_annotation_reshape(&mut self, msg: &AnnotationReshapeMessage) {
+        if let Some(a) = Rc::make_mut(&mut self.layerstack).get_annotation_mut(msg.id) {
+            a.rect = Rectangle::new(msg.x, msg.y, msg.w.max(1) as i32, msg.h.max(1) as i32);
+        }
+    }
+
+    fn handle_annotation_edit(&mut self, msg: &AnnotationEditMessage) {
+        if let Some(a) = Rc::make_mut(&mut self.layerstack).get_annotation_mut(msg.id) {
+            a.background = Color::from_argb32(msg.bg);
+            a.protect = (msg.flags & 0x01) != 0;
+            a.valign = match msg.flags & 0x06 {
+                0x02 => VAlign::Center,
+                0x06 => VAlign::Bottom,
+                _ => VAlign::Top,
+            };
+            // border not implemented yet
+            a.text = msg.text.clone();
+        }
+    }
+
+    fn handle_annotation_delete(&mut self, id: AnnotationID) {
+        Rc::make_mut(&mut self.layerstack).remove_annotation(id);
     }
 
     fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {

@@ -1,5 +1,5 @@
+use dpcore::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
 use dpcore::paint::tile::Tile;
-use dpcore::paint::layerstack::{LayerStack, LayerInsertion, LayerFill};
 use dpcore::paint::{editlayer, Blendmode, BrushMask, Color, Layer};
 
 mod utils;

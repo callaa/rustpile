@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_alpha_mask_blend() {
-        let mut base = [Color::rgb8(255, 0, 0).as_pixel();3];
+        let mut base = [Color::rgb8(255, 0, 0).as_pixel(); 3];
         let mask = [0xff, 0x80, 0x40];
 
         alpha_mask_blend(&mut base, Color::rgb8(0, 0, 255).as_pixel(), &mask);

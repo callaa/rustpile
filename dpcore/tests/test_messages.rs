@@ -57,8 +57,7 @@ fn test_message_serialization() {
             )),
         ),
         (
-            b"\x00\x10\x81\x01\0\0\0\x0a\xff\xff\xff\xf6\0\0\0\x63\xff\xff\xfe\xbf"
-                .to_vec(),
+            b"\x00\x10\x81\x01\0\0\0\x0a\xff\xff\xff\xf6\0\0\0\x63\xff\xff\xfe\xbf".to_vec(),
             Message::from(CommandMessage::CanvasResize(
                 1,
                 CanvasResizeMessage {
