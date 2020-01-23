@@ -24,6 +24,7 @@ A full reimplementation (with the GUI parts in C++) would be structured somethin
  * (Rust lib) drawpile-core: the paint engine and state tracker. (Everything needed by a headless drawpile instance, IO stuff excluded)
  * (Rust lib) drawpile-brushes: the brushes and other tools for use by GUI implementations?
  * (Rust lib) drawpile-libserver: the server implementation
+ * (Rust lib) libdrawpile: a FFI wrapper library that exports a C API
 
 Pie-in-the-sky stuff now within the realm of possibility:
 
@@ -37,7 +38,7 @@ Clone the repo and run `cargo test` to make sure everything works.
 Run `cargo run --example` to get a list of available example programs.
 E.g. running `cargo run --example layer_fillrect` will run the example program in `dpcore/examples/layer_fillrect.rs`. It writes out a file named `example_layer_fillrect.png` you can view.
 
-The `drawpile-cli` tool currently does the same job as `dprectool`. In the future, it will also incorporate the functionality of `drawpile-cmd`.
+The `drawpile-cli` tool combines the functionality of `dprectool` and `drawpile-cmd`. It can be used to convert between text and binary encoded recordings and to render recordings.
 
 ## Current status
 
@@ -46,14 +47,12 @@ What is implemented:
  * Most of the paint engine
  * Protocol (de)serialization
  * Text mode protocol (de)serialization
+ * State tracker
 
 What's missing:
 
- * Parts of the paint engine:
-   * Layer stack observer
-   * Flood fill algorithm (not needed for headless mode)
- * State tracker
  * ACL filtering
+ * C API for use from other languages
 
 ## License
 
