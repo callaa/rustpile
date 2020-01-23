@@ -1,5 +1,5 @@
 use crate::paint::{
-    editlayer, Blendmode, BrushMask, ClassicBrushCache, Color, Layer, LayerID, UserID,
+    editlayer, AoE, Blendmode, BrushMask, ClassicBrushCache, Color, Layer, LayerID, UserID,
 };
 use crate::protocol::message::{DrawDabsClassicMessage, DrawDabsPixelMessage};
 
@@ -10,27 +10,27 @@ pub fn drawdabs_classic(
     user: UserID,
     dabs: &DrawDabsClassicMessage,
     cache: &mut ClassicBrushCache,
-) {
+) -> AoE {
     let mode = Blendmode::try_from(dabs.mode).unwrap_or(Blendmode::Normal);
     let mut color = Color::from_argb32(dabs.color);
 
-    if color.a > 0.0 {
+    let aoe = if color.a > 0.0 {
         // If alpha is given, these dabs will be drawn in indirect mode
         let sublayer = layer.get_or_create_sublayer(user as LayerID);
         sublayer.opacity = color.a;
         sublayer.blendmode = mode;
         color.a = 1.0;
-        drawdabs_classic_draw(sublayer, user, color, Blendmode::Normal, &dabs, cache);
+        drawdabs_classic_draw(sublayer, user, color, Blendmode::Normal, &dabs, cache)
     } else {
         color.a = 1.0; // needed because as_pixel returns premultiplied pixel values
-        drawdabs_classic_draw(layer, user, color, mode, &dabs, cache);
-    }
+        drawdabs_classic_draw(layer, user, color, mode, &dabs, cache)
+    };
 
     if mode.can_decrease_opacity() {
-        layer.optimize();
+        layer.optimize(&aoe);
     }
 
-    // TODO return AoE
+    aoe
 }
 
 fn drawdabs_classic_draw(
@@ -40,9 +40,10 @@ fn drawdabs_classic_draw(
     mode: Blendmode,
     dabs: &DrawDabsClassicMessage,
     cache: &mut ClassicBrushCache,
-) {
+) -> AoE {
     let mut last_x = dabs.x;
     let mut last_y = dabs.y;
+    let mut aoe = AoE::Nothing;
     for dab in dabs.dabs.iter() {
         let x = last_x + dab.x as i32;
         let y = last_y + dab.y as i32;
@@ -55,34 +56,43 @@ fn drawdabs_classic_draw(
             dab.opacity as f32 / 255.0,
             cache,
         );
-        editlayer::draw_brush_dab(layer, user, mx, my, &mask, &color, mode);
+        aoe = aoe.merge(editlayer::draw_brush_dab(
+            layer, user, mx, my, &mask, &color, mode,
+        ));
 
         last_x = x;
         last_y = y;
     }
+
+    aoe
 }
 
-pub fn drawdabs_pixel(layer: &mut Layer, user: UserID, dabs: &DrawDabsPixelMessage, square: bool) {
+pub fn drawdabs_pixel(
+    layer: &mut Layer,
+    user: UserID,
+    dabs: &DrawDabsPixelMessage,
+    square: bool,
+) -> AoE {
     let mode = Blendmode::try_from(dabs.mode).unwrap_or(Blendmode::Normal);
     let mut color = Color::from_argb32(dabs.color);
 
-    if color.a > 0.0 {
+    let aoe = if color.a > 0.0 {
         // If alpha is given, these dabs will be drawn in indirect mode
         let sublayer = layer.get_or_create_sublayer(user as LayerID);
         sublayer.opacity = color.a;
         sublayer.blendmode = mode;
         color.a = 1.0;
-        drawdabs_pixel_draw(sublayer, user, color, Blendmode::Normal, &dabs, square);
+        drawdabs_pixel_draw(sublayer, user, color, Blendmode::Normal, &dabs, square)
     } else {
         color.a = 1.0; // needed because as_pixel returns premultiplied pixel values
-        drawdabs_pixel_draw(layer, user, color, mode, &dabs, square);
-    }
+        drawdabs_pixel_draw(layer, user, color, mode, &dabs, square)
+    };
 
     if mode.can_decrease_opacity() {
-        layer.optimize();
+        layer.optimize(&aoe);
     }
 
-    // TODO return AoE
+    aoe
 }
 
 fn drawdabs_pixel_draw(
@@ -92,7 +102,7 @@ fn drawdabs_pixel_draw(
     mode: Blendmode,
     dabs: &DrawDabsPixelMessage,
     square: bool,
-) {
+) -> AoE {
     let mut mask = BrushMask {
         diameter: 0,
         mask: Vec::new(),
@@ -102,6 +112,7 @@ fn drawdabs_pixel_draw(
     let mut last_y = dabs.y;
     let mut last_size = 0;
     let mut last_opacity = 0;
+    let mut aoe = AoE::Nothing;
 
     for dab in dabs.dabs.iter() {
         let x = last_x + dab.x as i32;
@@ -118,9 +129,19 @@ fn drawdabs_pixel_draw(
         }
 
         let offset = dab.size as i32 / 2;
-        editlayer::draw_brush_dab(layer, user, x - offset, y - offset, &mask, &color, mode);
+        aoe = aoe.merge(editlayer::draw_brush_dab(
+            layer,
+            user,
+            x - offset,
+            y - offset,
+            &mask,
+            &color,
+            mode,
+        ));
 
         last_x = x;
         last_y = y;
     }
+
+    aoe
 }

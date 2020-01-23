@@ -3,7 +3,7 @@ use super::compression;
 use super::history::History;
 use crate::paint::annotation::{AnnotationID, VAlign};
 use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
-use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID};
+use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID, AoE};
 use crate::protocol::message::*;
 
 use std::convert::TryFrom;
@@ -35,7 +35,7 @@ impl CanvasState {
         self.handle_message(msg);
     }
 
-    fn handle_message(&mut self, msg: &CommandMessage) {
+    fn handle_message(&mut self, msg: &CommandMessage) -> AoE {
         use CommandMessage::*;
         match &msg {
             UndoPoint(user) => self.handle_undopoint(*user),
@@ -62,12 +62,13 @@ impl CanvasState {
         }
     }
 
-    fn handle_undopoint(&mut self, user_id: UserID) {
+    fn handle_undopoint(&mut self, user_id: UserID) -> AoE {
         self.make_savepoint_if_needed();
         // set "has participated" flag
+        AoE::Nothing
     }
 
-    fn handle_undo(&mut self, user_id: UserID, msg: &UndoMessage) {
+    fn handle_undo(&mut self, user_id: UserID, msg: &UndoMessage) -> AoE {
         // Session operators are allowed to undo/redo other users' work
         let user = if msg.override_user > 0 {
             msg.override_user
@@ -81,44 +82,48 @@ impl CanvasState {
             self.history.undo(user)
         };
 
+        let mut aoe = AoE::Nothing;
         if let Some((savepoint, messages)) = replay {
             self.layerstack = savepoint;
             for msg in messages {
-                self.handle_message(&msg);
+                aoe = aoe.merge(self.handle_message(&msg));
             }
         }
+        aoe
     }
 
     /// Penup does nothing but end indirect strokes.
     /// This is done by merging this user's sublayers.
-    fn handle_penup(&mut self, user_id: UserID) {
+    fn handle_penup(&mut self, user_id: UserID) -> AoE {
         let sublayer_id = user_id as LayerID;
 
         // Note: we could do a read-only pass first to check if
         // this is necesary at all, but we can just as well simply
         // not send unnecessary PenUps.
 
-        // TODO map to AoE
         Rc::make_mut(&mut self.layerstack)
             .iter_layers_mut()
             .filter(|l| l.has_sublayer(sublayer_id)) // avoid unnecessary clones
-            .for_each(|l| {
-                editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id);
-            });
+            .fold(AoE::Nothing,
+                |aoe, l| {
+                aoe.merge(editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id))
+            })
     }
 
-    fn handle_canvas_resize(&mut self, msg: &CanvasResizeMessage) {
+    fn handle_canvas_resize(&mut self, msg: &CanvasResizeMessage) -> AoE {
         if let Some(ls) = self
             .layerstack
             .resized(msg.top, msg.right, msg.bottom, msg.left)
         {
             self.layerstack = Rc::new(ls);
+            AoE::Resize(msg.left, msg.top)
         } else {
             warn!("Invalid resize: {:?}", msg);
+            AoE::Nothing
         }
     }
 
-    fn handle_layer_create(&mut self, msg: &LayerCreateMessage) {
+    fn handle_layer_create(&mut self, msg: &LayerCreateMessage) -> AoE {
         let pos = match (
             msg.flags & LayerCreateMessage::FLAGS_INSERT != 0,
             msg.source,
@@ -135,16 +140,28 @@ impl CanvasState {
         };
 
         if let Some(layer) =
-            Rc::make_mut(&mut self.layerstack).add_layer(msg.id as LayerID, fill, pos)
+            Rc::make_mut(&mut self.layerstack).add_layer(msg.id as LayerID, fill.clone(), pos)
         {
             layer.title = msg.name.clone();
+
+            match fill {
+                LayerFill::Copy(_) => layer.nonblank_tilemap().into(),
+                LayerFill::Solid(c) => {
+                    if c.is_transparent() {
+                        AoE::Nothing
+                    } else {
+                        AoE::Everything
+                    }
+                }
+            }
         } else {
             // todo add_layer could return Result instead with a better error message
             warn!("LayerCreate: layer {:04x} could not be created", msg.id);
+            AoE::Nothing
         }
     }
 
-    fn handle_layer_attributes(&mut self, msg: &LayerAttributesMessage) {
+    fn handle_layer_attributes(&mut self, msg: &LayerAttributesMessage) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID) {
             editlayer::change_attributes(
                 layer,
@@ -153,63 +170,76 @@ impl CanvasState {
                 Blendmode::try_from(msg.blend).unwrap_or(Blendmode::Normal),
                 (msg.flags & LayerAttributesMessage::FLAGS_CENSOR) != 0,
                 (msg.flags & LayerAttributesMessage::FLAGS_FIXED) != 0,
-            );
+            )
         } else {
             warn!("LayerAttributes: Layer {:04x} not found!", msg.id);
+            AoE::Nothing
         }
     }
 
-    fn handle_layer_retitle(&mut self, msg: &LayerRetitleMessage) {
+    fn handle_layer_retitle(&mut self, msg: &LayerRetitleMessage) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID) {
             layer.title = msg.title.clone()
         } else {
             warn!("LayerRetitle: Layer {:04x} not found!", msg.id);
         }
+        AoE::Nothing
     }
 
-    fn handle_layer_order(&mut self, new_order: &[u16]) {
+    fn handle_layer_order(&mut self, new_order: &[u16]) -> AoE {
         let order: Vec<LayerID> = new_order.iter().map(|i| *i as LayerID).collect();
         self.layerstack = Rc::new(self.layerstack.reordered(&order));
+
+        AoE::Everything
     }
 
-    fn handle_layer_delete(&mut self, msg: &LayerDeleteMessage) {
+    fn handle_layer_delete(&mut self, msg: &LayerDeleteMessage) -> AoE {
         let stack = Rc::make_mut(&mut self.layerstack);
         let id = msg.id as LayerID;
-        if msg.merge {
+        let aoe = if msg.merge {
             if let Some(below) = stack.find_layer_below(id) {
                 let above = stack.get_layer_rc(id).unwrap();
                 editlayer::merge(stack.get_layer_mut(below).unwrap(), &above);
             } else {
                 warn!("LayerDelete: Cannot merge {:04x}", id);
-                return;
+                return AoE::Nothing;
             }
-        }
+            AoE::Nothing
+        } else {
+            stack.get_layer(id).map(|l| l.nonblank_tilemap().into()).unwrap_or(AoE::Nothing)
+        };
+
         stack.remove_layer(id);
+        aoe
     }
 
-    fn handle_layer_visibility(&mut self, user: UserID, msg: &LayerVisibilityMessage) {
+    fn handle_layer_visibility(&mut self, user: UserID, msg: &LayerVisibilityMessage) -> AoE {
         if user == self.local_user_id {
             if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.id as LayerID)
             {
                 layer.hidden = !msg.visible;
+                return layer.nonblank_tilemap().into();
             }
         }
+        AoE::Nothing
     }
 
-    fn handle_annotation_create(&mut self, msg: &AnnotationCreateMessage) {
+    fn handle_annotation_create(&mut self, msg: &AnnotationCreateMessage) -> AoE {
         Rc::make_mut(&mut self.layerstack).add_annotation(
             msg.id,
             Rectangle::new(msg.x, msg.y, msg.w.max(1) as i32, msg.h.max(1) as i32),
         );
+        AoE::Nothing
     }
 
-    fn handle_annotation_reshape(&mut self, msg: &AnnotationReshapeMessage) {
+    fn handle_annotation_reshape(&mut self, msg: &AnnotationReshapeMessage) -> AoE {
         if let Some(a) = Rc::make_mut(&mut self.layerstack).get_annotation_mut(msg.id) {
             a.rect = Rectangle::new(msg.x, msg.y, msg.w.max(1) as i32, msg.h.max(1) as i32);
         }
+        AoE::Nothing
     }
 
-    fn handle_annotation_edit(&mut self, msg: &AnnotationEditMessage) {
+    fn handle_annotation_edit(&mut self, msg: &AnnotationEditMessage) -> AoE {
         if let Some(a) = Rc::make_mut(&mut self.layerstack).get_annotation_mut(msg.id) {
             a.background = Color::from_argb32(msg.bg);
             a.protect = (msg.flags & 0x01) != 0;
@@ -221,46 +251,49 @@ impl CanvasState {
             // border not implemented yet
             a.text = msg.text.clone();
         }
+        AoE::Nothing
     }
 
-    fn handle_annotation_delete(&mut self, id: AnnotationID) {
+    fn handle_annotation_delete(&mut self, id: AnnotationID) -> AoE {
         Rc::make_mut(&mut self.layerstack).remove_annotation(id);
+        AoE::Nothing
     }
 
-    fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) {
+    fn handle_puttile(&mut self, user_id: UserID, msg: &PutTileMessage) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
             if let Some(tile) = compression::decompress_tile(&msg.image, user_id) {
-                editlayer::put_tile(
+                return editlayer::put_tile(
                     layer,
                     msg.sublayer as LayerID,
                     msg.col.into(),
                     msg.row.into(),
                     msg.repeat.into(),
                     &tile,
-                );
+                )
             }
         } else {
             warn!("PutTile: Layer {:04x} not found!", msg.layer);
         }
+        AoE::Nothing
     }
 
-    fn handle_putimage(&mut self, user_id: UserID, msg: &PutImageMessage) {
+    fn handle_putimage(&mut self, user_id: UserID, msg: &PutImageMessage) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
             if msg.w == 0 || msg.h == 0 {
                 warn!("PutImage: zero size!");
-                return;
+                return AoE::Nothing;
             }
             if msg.w > 65535 || msg.h > 65535 {
                 warn!("PutImage: oversize image! ({}, {})", msg.w, msg.h);
-                return;
+                return AoE::Nothing;
             }
             if let Some(imagedata) =
                 compression::decompress_image(&msg.image, (msg.w * msg.h) as usize)
             {
                 let mode = Blendmode::try_from(msg.mode).unwrap_or_default();
-                editlayer::draw_image(
+                let aoe = editlayer::draw_image(
                     layer,
                     user_id,
                     &imagedata,
@@ -270,30 +303,35 @@ impl CanvasState {
                 );
 
                 if mode.can_decrease_opacity() {
-                    layer.optimize();
+                    layer.optimize(&aoe);
                 }
+                return aoe;
             }
         } else {
             warn!("PutImage: Layer {:04x} not found!", msg.layer);
         }
+        AoE::Nothing
     }
 
-    fn handle_background(&mut self, pixels: &[u8]) {
+    fn handle_background(&mut self, pixels: &[u8]) -> AoE {
         if let Some(tile) = compression::decompress_tile(pixels, 0) {
             Rc::make_mut(&mut self.layerstack).background = tile;
+            AoE::Everything
+        } else {
+            AoE::Nothing
         }
     }
 
-    fn handle_fillrect(&mut self, user: UserID, msg: &FillRectMessage) {
+    fn handle_fillrect(&mut self, user: UserID, msg: &FillRectMessage) -> AoE {
         if msg.w == 0 || msg.h == 0 {
             warn!("FillRect(user {}): zero size rectangle", user);
-            return;
+            return AoE::Nothing;
         }
 
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
             let mode = Blendmode::try_from(msg.mode).unwrap_or_default();
-            editlayer::fill_rect(
+            let aoe = editlayer::fill_rect(
                 layer,
                 user,
                 &Color::from_argb32(msg.color),
@@ -302,28 +340,33 @@ impl CanvasState {
             );
 
             if mode.can_decrease_opacity() {
-                layer.optimize();
+                layer.optimize(&aoe);
             }
+
+            return aoe
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
         }
+        AoE::Nothing
     }
 
-    fn handle_drawdabs_classic(&mut self, user: UserID, msg: &DrawDabsClassicMessage) {
+    fn handle_drawdabs_classic(&mut self, user: UserID, msg: &DrawDabsClassicMessage) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
-            brushes::drawdabs_classic(layer, user, &msg, &mut self.brushcache);
+            brushes::drawdabs_classic(layer, user, &msg, &mut self.brushcache)
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
+            AoE::Nothing
         }
     }
 
-    fn handle_drawdabs_pixel(&mut self, user: UserID, msg: &DrawDabsPixelMessage, square: bool) {
+    fn handle_drawdabs_pixel(&mut self, user: UserID, msg: &DrawDabsPixelMessage, square: bool) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
-            brushes::drawdabs_pixel(layer, user, &msg, square);
+            brushes::drawdabs_pixel(layer, user, &msg, square)
         } else {
             warn!("DrawDabsPixel: Layer {:04x} not found!", msg.layer);
+            AoE::Nothing
         }
     }
 

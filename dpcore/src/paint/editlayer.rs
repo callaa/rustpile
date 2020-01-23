@@ -1,20 +1,7 @@
+use super::aoe::{AoE, TileMap};
 use super::rectiter::RectIterator;
 use super::tile::{Tile, TILE_SIZE, TILE_SIZEI};
 use super::{rasterop, Blendmode, BrushMask, Color, Layer, LayerID, Pixel, Rectangle, UserID};
-
-/// A layer editing operation's area of effect.
-///
-/// This is used inform layer observers which part
-/// of the layer stack should be refreshed.
-///
-/// Note that the AoE can be `Nothing` even if some pixels were changed
-/// if the layer is not visible.
-#[derive(Debug)]
-pub enum AoE {
-    Rectangle(Rectangle),
-    Everything,
-    Nothing,
-}
 
 /// Fills a rectangle with a solid color using the given blending mode
 ///
@@ -57,7 +44,7 @@ pub fn fill_rect(
         }
     }
 
-    AoE::Rectangle(r)
+    r.into()
 }
 
 /// Draw a brush mask onto the layer
@@ -118,7 +105,7 @@ pub fn draw_brush_dab(
         }
     }
 
-    AoE::Rectangle(rect)
+    rect.into()
 }
 
 /// Draw an image onto the layer
@@ -170,11 +157,12 @@ pub fn draw_image(
         }
     }
 
-    AoE::Rectangle(destrect)
+    destrect.into()
 }
 
-/// Replace a tile or a stretch of tiles
-/// This is typically used to
+/// Replace a tile or a stretch of tiles.
+/// This is typically used to set the initial canvas content
+/// at the start of a session.
 pub fn put_tile(
     layer: &mut Layer,
     sublayer: LayerID,
@@ -211,7 +199,13 @@ pub fn put_tile(
         *t = tile.clone();
     }
 
-    AoE::Everything // TODO
+    if end > start {
+        let mut aoe = TileMap::new(xtiles, Tile::div_up(layer.height()));
+        aoe.tiles[start..=end].set_all(true);
+        aoe.into()
+    } else {
+        Rectangle::tile(col as i32, row as i32, xtiles as i32).into()
+    }
 }
 
 /// Merge another layer to this one
@@ -232,8 +226,7 @@ pub fn merge(target_layer: &mut Layer, source_layer: &Layer) -> AoE {
         .for_each(|(d, s)| d.merge(s, source_layer.opacity, source_layer.blendmode));
 
     if source_layer.is_visible() {
-        // TODO visible tiles only
-        AoE::Everything
+        source_layer.nonblank_tilemap().into()
     } else {
         AoE::Nothing
     }
@@ -250,9 +243,8 @@ pub fn merge_sublayer(layer: &mut Layer, sublayer_id: LayerID) -> AoE {
 
 /// Remove a sublayer without merging it
 pub fn remove_sublayer(layer: &mut Layer, sublayer_id: LayerID) -> AoE {
-    if let Some(_sublayer) = layer.take_sublayer(sublayer_id) {
-        // TODO visible tiles only
-        AoE::Everything
+    if let Some(sublayer) = layer.take_sublayer(sublayer_id) {
+        sublayer.nonblank_tilemap().into()
     } else {
         AoE::Nothing
     }
@@ -270,15 +262,16 @@ pub fn change_attributes(
         let sl = layer.get_or_create_sublayer(sublayer);
         sl.blendmode = blend;
         sl.opacity = opacity;
+
+        sl.nonblank_tilemap().into()
     } else {
         layer.blendmode = blend;
         layer.opacity = opacity;
         layer.censored = censored;
         layer.fixed = fixed;
-    }
 
-    // TODO
-    AoE::Everything
+        layer.nonblank_tilemap().into()
+    }
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 pub mod annotation;
+pub mod aoe;
 pub mod color;
 pub mod editlayer;
 pub mod layerstack;
@@ -16,6 +17,7 @@ mod brushmask;
 mod layer;
 mod rect;
 
+pub use aoe::AoE;
 pub use blendmode::Blendmode;
 pub use brushmask::{BrushMask, ClassicBrushCache};
 pub use color::{Color, Pixel};

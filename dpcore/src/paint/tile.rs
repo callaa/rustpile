@@ -238,6 +238,16 @@ impl Tile {
         }
     }
 
+    /// Do a shallow equality comparison between these two tiles
+    pub fn ptr_eq(&self, other: &Tile) -> bool {
+        use Tile::*;
+        match (self, other) {
+            (Blank, Blank) => true,
+            (Bitmap(a), Bitmap(b)) => Rc::ptr_eq(a, b),
+            (_, _) => false,
+        }
+    }
+
     #[cfg(test)]
     pub fn refcount(&self) -> usize {
         match self {

@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 use std::rc::Rc;
 
+use super::aoe::{AoE, TileMap};
 use super::blendmode::Blendmode;
 use super::color::{Color, Pixel};
 use super::rect::Rectangle;
@@ -85,7 +86,7 @@ impl Layer {
             }
         }
 
-        layer.optimize();
+        layer.optimize(&AoE::Everything);
         layer
     }
 
@@ -184,6 +185,15 @@ impl Layer {
         }
     }
 
+    /// Return a bitmap of non-blank tiles
+    pub fn nonblank_tilemap(&self) -> TileMap {
+        TileMap {
+            tiles: self.tiles.iter().map(|t| *t != Tile::Blank).collect(),
+            w: Tile::div_up(self.width),
+            h: Tile::div_up(self.height),
+        }
+    }
+
     /// Return the tile at the given index
     pub fn tile(&self, i: u32, j: u32) -> &Tile {
         debug_assert!(i * TILE_SIZE < self.width);
@@ -263,14 +273,45 @@ impl Layer {
         }
     }
 
-    /// Call optimize on every tile on this layer.
+    /// Call optimize on every tile in the given area.
     /// This will release memory and speed up rendering, as blank
     /// tiles can be skipped.
-    /// TODO this should take an AoE parameter to limit which tiles to look at
-    pub fn optimize(&mut self) {
-        Rc::make_mut(&mut self.tiles)
-            .iter_mut()
-            .for_each(|t| t.optimize());
+    pub fn optimize(&mut self, area: &AoE) {
+        use AoE::*;
+        match area {
+            Nothing => (),
+            Bounds(r) => self.tile_rect_mut(r).for_each(|(_, _, t)| t.optimize()),
+            // Note: when using a bitmap, we need to iterate through the
+            // entire vector anyway and an optimize call is cheap enough
+            // that there's no point to the extra check.
+            _ => {
+                Rc::make_mut(&mut self.tiles)
+                    .iter_mut()
+                    .for_each(|t| t.optimize());
+            }
+        }
+    }
+
+    /// Do a shallow comparison between these layers and return the difference
+    pub fn compare(&self, other: &Layer) -> AoE {
+        if Rc::ptr_eq(&self.tiles, &other.tiles) {
+            return AoE::Nothing;
+        }
+        if self.width != other.width || self.height != other.height {
+            return AoE::Resize(0, 0);
+        }
+
+        TileMap {
+            tiles: self
+                .tiles
+                .iter()
+                .zip(other.tiles.iter())
+                .map(|(a, b)| !a.ptr_eq(b))
+                .collect(),
+            w: Tile::div_up(self.width),
+            h: Tile::div_up(self.height),
+        }
+        .into()
     }
 
     /// Return a new layer with the size adjusted by the given values
@@ -412,6 +453,7 @@ impl Layer {
 mod tests {
     use super::super::color::{WHITE_PIXEL, ZERO_PIXEL};
     use super::*;
+    use bitvec::prelude::*;
 
     #[test]
     fn test_tilevector_cow() {
@@ -431,12 +473,22 @@ mod tests {
 
         // Tile vectors are shared at this point
         assert_eq!(layer.tiles[0].refcount(), 2);
+        assert_eq!(layer.compare(&layer2), AoE::Nothing);
 
         // Changing a tile makes the vectors unique:
         // there are now more references to the same tile data
         *layer.tile_mut(0, 0) = Tile::Blank;
         assert_eq!(layer.refcount(), 1);
         assert_eq!(layer2.tiles[0].refcount(), 3);
+
+        assert_eq!(
+            layer.compare(&layer2),
+            AoE::Bitmap(TileMap {
+                tiles: bitvec![1, 0],
+                w: 2,
+                h: 1,
+            })
+        );
     }
 
     #[test]

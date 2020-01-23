@@ -1,6 +1,7 @@
 use std::rc::Rc;
 
 use super::annotation::{Annotation, AnnotationID, VAlign};
+use super::aoe::AoE;
 use super::color::{Color, Pixel, ZERO_PIXEL};
 use super::tile::{Tile, TileData, TILE_SIZE};
 use super::{Layer, LayerID, Rectangle};
@@ -14,6 +15,7 @@ pub struct LayerStack {
     height: u32,
 }
 
+#[derive(Clone)]
 pub enum LayerFill {
     Solid(Color),
     Copy(LayerID),
@@ -273,6 +275,27 @@ impl LayerStack {
 
     pub fn iter_layers_mut(&mut self) -> impl Iterator<Item = &mut Rc<Layer>> {
         return Rc::make_mut(&mut self.layers).iter_mut();
+    }
+
+    /// Compare this layer stack with the other and return an Area Of Effect.
+    /// This is used when the entire layer stack is replaced, e.g. when
+    /// resetting to an earlier state as a part of an undo operation.
+    /// For performance reasons, shallow comparison is used.
+    pub fn compare(&self, other: &LayerStack) -> AoE {
+        if self.width != other.width || self.height != other.height {
+            return AoE::Resize(0, 0);
+        }
+        if Rc::ptr_eq(&self.layers, &other.layers) {
+            return AoE::Nothing;
+        }
+        if self.layers.len() != other.layers.len() {
+            return AoE::Everything;
+        }
+
+        self.layers
+            .iter()
+            .zip(other.layers.iter())
+            .fold(AoE::Nothing, |aoe, (a, b)| aoe.merge(a.compare(b)))
     }
 }
 

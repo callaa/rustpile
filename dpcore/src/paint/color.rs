@@ -76,6 +76,10 @@ impl Color {
             (self.a * 255.0) as u8,
         ]
     }
+
+    pub fn is_transparent(&self) -> bool {
+        self.a < (1.0/255.0)
+    }
 }
 
 impl PartialEq for Color {
