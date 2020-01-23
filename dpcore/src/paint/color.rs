@@ -78,7 +78,7 @@ impl Color {
     }
 
     pub fn is_transparent(&self) -> bool {
-        self.a < (1.0/255.0)
+        self.a < (1.0 / 255.0)
     }
 }
 

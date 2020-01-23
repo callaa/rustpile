@@ -50,7 +50,9 @@ pub fn render_recording(opts: &RenderOpts) -> Result<(), Box<dyn std::error::Err
             ReadMessage::Ok(m) => {
                 let now = Instant::now();
                 match &m {
-                    Message::Command(c) => canvas.receive_message(c),
+                    Message::Command(c) => {
+                        canvas.receive_message(c);
+                    }
                     _ => (),
                 }
                 total_render_time += now.elapsed();

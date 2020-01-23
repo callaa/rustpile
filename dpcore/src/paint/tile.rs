@@ -150,7 +150,7 @@ impl Tile {
 
     // Fill this tile with a solid color
     pub fn fill(&mut self, color: &Color, user: UserID) {
-        if color.a == 0.0 {
+        if color.is_transparent() {
             *self = Tile::Blank
         } else {
             match self {

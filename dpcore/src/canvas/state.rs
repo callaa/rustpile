@@ -3,7 +3,9 @@ use super::compression;
 use super::history::History;
 use crate::paint::annotation::{AnnotationID, VAlign};
 use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
-use crate::paint::{editlayer, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID, AoE};
+use crate::paint::{
+    editlayer, AoE, Blendmode, ClassicBrushCache, Color, LayerID, Rectangle, UserID,
+};
 use crate::protocol::message::*;
 
 use std::convert::TryFrom;
@@ -30,9 +32,9 @@ impl CanvasState {
     pub fn layerstack(&self) -> &LayerStack {
         &self.layerstack
     }
-    pub fn receive_message(&mut self, msg: &CommandMessage) {
+    pub fn receive_message(&mut self, msg: &CommandMessage) -> AoE {
         self.history.add(msg.clone());
-        self.handle_message(msg);
+        self.handle_message(msg)
     }
 
     fn handle_message(&mut self, msg: &CommandMessage) -> AoE {
@@ -104,8 +106,7 @@ impl CanvasState {
         Rc::make_mut(&mut self.layerstack)
             .iter_layers_mut()
             .filter(|l| l.has_sublayer(sublayer_id)) // avoid unnecessary clones
-            .fold(AoE::Nothing,
-                |aoe, l| {
+            .fold(AoE::Nothing, |aoe, l| {
                 aoe.merge(editlayer::merge_sublayer(Rc::make_mut(l), sublayer_id))
             })
     }
@@ -206,7 +207,10 @@ impl CanvasState {
             }
             AoE::Nothing
         } else {
-            stack.get_layer(id).map(|l| l.nonblank_tilemap().into()).unwrap_or(AoE::Nothing)
+            stack
+                .get_layer(id)
+                .map(|l| l.nonblank_tilemap().into())
+                .unwrap_or(AoE::Nothing)
         };
 
         stack.remove_layer(id);
@@ -270,7 +274,7 @@ impl CanvasState {
                     msg.row.into(),
                     msg.repeat.into(),
                     &tile,
-                )
+                );
             }
         } else {
             warn!("PutTile: Layer {:04x} not found!", msg.layer);
@@ -343,7 +347,7 @@ impl CanvasState {
                 layer.optimize(&aoe);
             }
 
-            return aoe
+            return aoe;
         } else {
             warn!("DrawDabsClassic: Layer {:04x} not found!", msg.layer);
         }
@@ -360,7 +364,12 @@ impl CanvasState {
         }
     }
 
-    fn handle_drawdabs_pixel(&mut self, user: UserID, msg: &DrawDabsPixelMessage, square: bool) -> AoE {
+    fn handle_drawdabs_pixel(
+        &mut self,
+        user: UserID,
+        msg: &DrawDabsPixelMessage,
+        square: bool,
+    ) -> AoE {
         if let Some(layer) = Rc::make_mut(&mut self.layerstack).get_layer_mut(msg.layer as LayerID)
         {
             brushes::drawdabs_pixel(layer, user, &msg, square)
