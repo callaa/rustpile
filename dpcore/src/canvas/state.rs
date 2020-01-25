@@ -1,6 +1,7 @@
 use super::brushes;
 use super::compression;
 use super::history::History;
+use super::retcon::{LocalFork, RetconAction};
 use crate::paint::annotation::{AnnotationID, VAlign};
 use crate::paint::layerstack::{LayerFill, LayerInsertion, LayerStack};
 use crate::paint::{
@@ -9,13 +10,15 @@ use crate::paint::{
 use crate::protocol::message::*;
 
 use std::convert::TryFrom;
+use std::mem;
 use std::rc::Rc;
-use tracing::warn;
+use tracing::{warn, error};
 
 pub struct CanvasState {
     layerstack: Rc<LayerStack>,
     history: History,
     brushcache: ClassicBrushCache,
+    localfork: LocalFork,
     local_user_id: UserID,
 }
 
@@ -25,6 +28,7 @@ impl CanvasState {
             layerstack: Rc::new(LayerStack::new(0, 0)),
             history: History::new(),
             brushcache: ClassicBrushCache::new(),
+            localfork: LocalFork::new().set_fallbehind(1000),
             local_user_id: 0,
         }
     }
@@ -32,8 +36,54 @@ impl CanvasState {
     pub fn layerstack(&self) -> &LayerStack {
         &self.layerstack
     }
+
+    /// Receive a message from the canonical session history and execute it
     pub fn receive_message(&mut self, msg: &CommandMessage) -> AoE {
         self.history.add(msg.clone());
+
+        let retcon = self.localfork.receive_remote_message(msg);
+
+        match retcon {
+            RetconAction::Concurrent => self.handle_message(msg),
+            RetconAction::AlreadyDone => AoE::Nothing,
+            RetconAction::Rollback(pos) => {
+                let replay = self.history.reset_before(pos);
+
+                // If the local fork still exists, move it to the end of the history
+                self.localfork.set_seqnum(self.history.end());
+
+                if let Some((savepoint, messages)) = replay {
+                    let old_layerstack = mem::replace(&mut self.layerstack, savepoint);
+                    let localfork = self.localfork.messages();
+                    for m in messages.iter().chain(localfork.iter()) {
+                        self.handle_message(m);
+                    }
+                    old_layerstack.compare(&self.layerstack)
+                } else {
+                    error!("Retcon failed! No savepoint found before {}", pos);
+                    AoE::Nothing
+                }
+            }
+        }
+    }
+
+    /// Receive a locally generated message that is not yet in the canonical
+    /// history and execute it. If an official message conflicts with any of
+    /// the locally added messages, the canvas is is reset to an earlier savepoint
+    /// and the history straightened out.
+    pub fn receive_local_message(&mut self, msg: &CommandMessage) -> AoE {
+        match msg {
+            CommandMessage::UndoPoint(_) => {
+                // Try creating a new savepoint before the local fork exists
+                self.make_savepoint_if_needed();
+            }
+            CommandMessage::Undo(_, _) => {
+                // Undos have to go through the server
+                return AoE::Nothing;
+            }
+            _ => (),
+        }
+        self.localfork.add_local_message(msg, self.history.end());
         self.handle_message(msg)
     }
 
@@ -64,9 +114,9 @@ impl CanvasState {
         }
     }
 
-    fn handle_undopoint(&mut self, user_id: UserID) -> AoE {
+    fn handle_undopoint(&mut self, _user_id: UserID) -> AoE {
         self.make_savepoint_if_needed();
-        // set "has participated" flag
+        // TODO set "has participated" flag
         AoE::Nothing
     }
 
@@ -84,14 +134,18 @@ impl CanvasState {
             self.history.undo(user)
         };
 
-        let mut aoe = AoE::Nothing;
         if let Some((savepoint, messages)) = replay {
-            self.layerstack = savepoint;
-            for msg in messages {
-                aoe = aoe.merge(self.handle_message(&msg));
+            let old_layerstack = mem::replace(&mut self.layerstack, savepoint);
+            // We can move the local fork to the end while we're at it
+            self.localfork.set_seqnum(self.history.end());
+            let localfork = self.localfork.messages();
+            for msg in messages.iter().chain(localfork.iter()) {
+                self.handle_message(&msg);
             }
+
+            return old_layerstack.compare(&self.layerstack);
         }
-        aoe
+        AoE::Nothing
     }
 
     /// Penup does nothing but end indirect strokes.
@@ -383,8 +437,8 @@ impl CanvasState {
         // Don't make savepoints while a local fork exists, since
         // there will be stuff on the canvas that is not yet in
         // the mainline session history
-        // TODO
-
-        self.history.add_savepoint(self.layerstack.clone());
+        if self.localfork.is_empty() {
+            self.history.add_savepoint(self.layerstack.clone());
+        }
     }
 }

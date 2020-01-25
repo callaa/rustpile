@@ -43,6 +43,10 @@ impl Color {
         }
     }
 
+    pub fn argb32_alpha(c: u32) -> u8 {
+        ((c & 0xff_000000) >> 24) as u8
+    }
+
     // Get a non-premultiplied pixel value from this color
     pub fn as_argb32(&self) -> u32 {
         ((self.r * 255.0) as u32) << 16

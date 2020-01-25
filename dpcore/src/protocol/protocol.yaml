@@ -381,6 +381,9 @@ LayerDelete:
 
              If the current layer or layer controls in general are locked, this command
              requires session operator privileges.
+
+             TODO protocol change: replace merge boolean with a destination layer ID
+             so knowledge of layer stack state is not needed to interpret it.
     fields:
         - id u16: hex
         - merge bool

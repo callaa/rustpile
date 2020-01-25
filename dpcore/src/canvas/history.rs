@@ -207,10 +207,37 @@ impl History {
     }
 
     pub fn add_savepoint(&mut self, layerstack: Rc<LayerStack>) {
-        self.savepoints.push(Savepoint {
-            layerstack,
-            seq_num: self.sequence,
-        });
+        if self.savepoints.last().map(|sp| sp.seq_num) != Some(self.sequence) {
+            self.savepoints.push(Savepoint {
+                layerstack,
+                seq_num: self.sequence,
+            });
+        }
+    }
+
+    /// Find a savepoint at or before this position and reset history to it.
+    pub fn reset_before(&mut self, pos: u32) -> Option<(Rc<LayerStack>, Vec<CommandMessage>)> {
+        let savepoint = self.savepoints.iter().rfind(|sp| sp.seq_num <= pos)?;
+
+        let replay = self
+            .history
+            .iter()
+            .filter(|e| e.seq_num > savepoint.seq_num && e.state == UndoState::Done)
+            .map(|e| e.msg.clone())
+            .collect();
+
+        let layerstack = savepoint.layerstack.clone();
+
+        // Savepoints newer than this one are no longer valid
+        let retain_up_to = savepoint.seq_num;
+        self.savepoints.retain(|sp| sp.seq_num <= retain_up_to);
+
+        Some((layerstack, replay))
+    }
+
+    /// Return the sequence number of the last message
+    pub fn end(&self) -> u32 {
+        self.sequence
     }
 }
 

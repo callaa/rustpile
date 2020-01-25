@@ -51,6 +51,15 @@ impl ObservableCanvasState {
         }
     }
 
+    /// Handle a local command.
+    /// Subscribers will be notified of any possible visual changes.
+    pub fn receive_local_message(&mut self, msg: &CommandMessage) {
+        let aoe = self.canvas.receive_local_message(msg);
+        if aoe != AoE::Nothing {
+            self.notify(aoe);
+        }
+    }
+
     fn notify(&mut self, aoe: AoE) {
         let mut cleanup = false;
 
