@@ -591,8 +591,8 @@ DrawDabsClassic:
             - x i8: div4
             - y i8: div4
             - size u16: div256
-            - opacity u8
             - hardness u8
+            - opacity u8
 
 DrawDabsPixel:
     id: 149

@@ -981,8 +981,8 @@ pub struct ClassicDab {
     pub x: i8,
     pub y: i8,
     pub size: u16,
-    pub opacity: u8,
     pub hardness: u8,
+    pub opacity: u8,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1011,14 +1011,14 @@ impl DrawDabsClassicMessage {
             let x = reader.read::<i8>();
             let y = reader.read::<i8>();
             let size = reader.read::<u16>();
-            let opacity = reader.read::<u8>();
             let hardness = reader.read::<u8>();
+            let opacity = reader.read::<u8>();
             dabs.push(ClassicDab {
                 x,
                 y,
                 size,
-                opacity,
                 hardness,
+                opacity,
             });
         }
         Ok(Self {
@@ -1042,8 +1042,8 @@ impl DrawDabsClassicMessage {
             w.write(item.x);
             w.write(item.y);
             w.write(item.size);
-            w.write(item.opacity);
             w.write(item.hardness);
+            w.write(item.opacity);
         }
 
         w.into()
@@ -1056,8 +1056,8 @@ impl DrawDabsClassicMessage {
                 dab.x as f64 / 4.0,
                 dab.y as f64 / 4.0,
                 dab.size as f64 / 256.0,
-                dab.opacity as f64,
                 dab.hardness as f64,
+                dab.opacity as f64,
             ]);
         }
         txt.set("layer", format!("0x{:04x}", self.layer))
@@ -1078,8 +1078,8 @@ impl DrawDabsClassicMessage {
                 x: (dab[0] * 4.0) as i8,
                 y: (dab[1] * 4.0) as i8,
                 size: (dab[2] * 256.0) as u16,
-                opacity: (dab[3]) as u8,
-                hardness: (dab[4]) as u8,
+                hardness: (dab[3]) as u8,
+                opacity: (dab[4]) as u8,
             });
         }
 
@@ -1509,6 +1509,9 @@ pub enum CommandMessage {
     ///
     /// If the current layer or layer controls in general are locked, this command
     /// requires session operator privileges.
+    ///
+    /// TODO protocol change: replace merge boolean with a destination layer ID
+    /// so knowledge of layer stack state is not needed to interpret it.
     ///
     LayerDelete(u8, LayerDeleteMessage),
 
