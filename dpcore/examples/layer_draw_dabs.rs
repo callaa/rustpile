@@ -35,11 +35,11 @@ fn main() {
         );
 
         let (bx, by, brush) =
-            BrushMask::new_gimp_style(x as f32, 90.0, w as f32, 0.0, 1.0, &mut cache);
+            BrushMask::new_gimp_style_v2(x as f32, 90.0, w as f32, 0.0, 1.0, &mut cache);
         editlayer::draw_brush_dab(&mut layer, 0, bx, by, &brush, &black, Blendmode::Normal);
 
         let (bx, by, brush) =
-            BrushMask::new_gimp_style(x as f32, 120.0, w as f32, 1.0, 1.0, &mut cache);
+            BrushMask::new_gimp_style_v2(x as f32, 120.0, w as f32, 1.0, 1.0, &mut cache);
         editlayer::draw_brush_dab(&mut layer, 0, bx, by, &brush, &black, Blendmode::Normal);
 
         w += 1;

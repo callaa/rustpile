@@ -2,17 +2,24 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use dpcore::paint::{BrushMask, ClassicBrushCache};
 
 fn gimp_style_dab_benchmark(c: &mut Criterion) {
-    c.bench_function("small GIMP style dab", |b| {
+    c.bench_function("tiny v2 GIMP style dab", |b| {
         let mut cache = ClassicBrushCache::new(); // note: this produces a single outlier when the LUT is generated
         b.iter(|| {
-            BrushMask::new_gimp_style(0.0, 0.0, 15.0, 0.5, 1.0, &mut cache);
+            BrushMask::new_gimp_style_v2(0.0, 0.0, 1.0, 0.5, 1.0, &mut cache);
         })
     });
 
-    c.bench_function("big GIMP style dab", |b| {
+    c.bench_function("small v2 GIMP style dab", |b| {
         let mut cache = ClassicBrushCache::new(); // note: this produces a single outlier when the LUT is generated
         b.iter(|| {
-            BrushMask::new_gimp_style(0.0, 0.0, 30.0, 0.5, 1.0, &mut cache);
+            BrushMask::new_gimp_style_v2(0.0, 0.0, 15.0, 0.5, 1.0, &mut cache);
+        })
+    });
+
+    c.bench_function("big v2 GIMP style dab", |b| {
+        let mut cache = ClassicBrushCache::new(); // note: this produces a single outlier when the LUT is generated
+        b.iter(|| {
+            BrushMask::new_gimp_style_v2(0.0, 0.0, 30.0, 0.5, 1.0, &mut cache);
         })
     });
 }

@@ -48,7 +48,7 @@ fn drawdabs_classic_draw(
         let x = last_x + dab.x as i32;
         let y = last_y + dab.y as i32;
 
-        let (mx, my, mask) = BrushMask::new_gimp_style(
+        let (mx, my, mask) = BrushMask::new_gimp_style_v2(
             x as f32 / 4.0,
             y as f32 / 4.0,
             dab.size as f32 / 256.0,

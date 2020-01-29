@@ -22,7 +22,7 @@ impl ClassicBrushCache {
     fn get_cached_lut(&mut self, hardness: f32) -> &[f32] {
         let h = (hardness * 100.0) as usize;
         if self.lut[h].is_empty() {
-            self.lut[h] = make_gimp_style_brush_lut(hardness);
+            self.lut[h] = make_gimp_style_v2_brush_lut(hardness);
         }
         &self.lut[h]
     }
@@ -30,6 +30,14 @@ impl ClassicBrushCache {
 
 fn square(v: f32) -> f32 {
     v * v
+}
+
+fn fast_sqrt(x: f32) -> f32 {
+    let mut i = x.to_bits();
+    i = i.wrapping_sub(1 << 23);
+    i = i >> 1;
+    i = i.wrapping_add(1 << 29);
+    f32::from_bits(i)
 }
 
 impl BrushMask {
@@ -63,10 +71,7 @@ impl BrushMask {
         }
     }
 
-    /// Make a Gimp style subpixel resolution brush mask
-    /// Return value include the integer coordinates where the brush mask should be dabbed
-    /// TODO this whole thing needs a rewrite, but that will be a protocol change
-    pub fn new_gimp_style(
+    pub fn new_gimp_style_v2(
         x: f32,
         y: f32,
         diameter: f32,
@@ -74,189 +79,122 @@ impl BrushMask {
         opacity: f32,
         cache: &mut ClassicBrushCache,
     ) -> (i32, i32, BrushMask) {
-        let (offset, mask) = if diameter < 16.0 {
-            BrushMask::new_gimp_style_highres(diameter / 2.0, hardness, opacity, cache)
+        let mask = if diameter <= 3.0 {
+            BrushMask::new_gimp_style_v2_oversampled(x, y, diameter, hardness, opacity, cache)
         } else {
-            BrushMask::new_gimp_style_lowres(diameter / 2.0, hardness, opacity, cache)
+            BrushMask::new_gimp_style_v2_simple(x, y, diameter, hardness, opacity, cache)
         };
+
+        let r = diameter as i32 / 2 + 1;
+        (x as i32 - r, y as i32 - r, mask)
+    }
+
+    fn new_gimp_style_v2_oversampled(
+        x: f32,
+        y: f32,
+        diameter: f32,
+        hardness: f32,
+        opacity: f32,
+        cache: &mut ClassicBrushCache,
+    ) -> BrushMask {
+        let idia = diameter.ceil().max(1.0) as usize + 2;
+
+        let mut mask = vec![0u8; idia * idia];
 
         let fx = x.floor();
         let fy = y.floor();
+        let xfrac = x - fx;
+        let yfrac = y - fy;
 
-        // this doesn't work right with negative values, but fixing it is a protocol change
-        let mut xfrac = x - fx;
-        let mut yfrac = y - fy;
+        let diameter_offset = (1.0 - diameter % 2.0) / 2.0;
+        let radius = diameter as f32 + 0.5; // oversample
+        let xoffset = 0.5 - xfrac * 2.0 - radius - diameter_offset;
+        let yoffset = 0.5 - yfrac * 2.0 - radius - diameter_offset;
 
-        let ix = if xfrac < 0.5 {
-            xfrac += 0.5;
-            (fx - 1.0 - offset) as i32
-        } else {
-            xfrac -= 0.5;
-            (fx - offset) as i32
-        };
-
-        let iy = if yfrac < 0.5 {
-            yfrac += 0.5;
-            (fy - 1.0 - offset) as i32
-        } else {
-            yfrac -= 0.5;
-            (fy - offset) as i32
-        };
-
-        (ix, iy, mask.offset(xfrac, yfrac))
-    }
-
-    // Make a high-res Gimp style mask useful for small brushes. Return values includes x/y offset to get the top-left corner
-    fn new_gimp_style_highres(
-        radius: f32,
-        hardness: f32,
-        opacity: f32,
-        cache: &mut ClassicBrushCache,
-    ) -> (f32, BrushMask) {
-        let op = opacity * (255.0 / 4.0); // opacity per subsample
-        let mut diameter = (radius * 2.0).ceil() as u32 + 2;
-        let mut offset = (radius.ceil() - radius) / -2.0;
-
-        if diameter % 2 == 0 {
-            diameter += 1;
-            offset -= 2.5;
-        } else {
-            offset -= 1.5;
-        }
-
-        let r2 = radius * 2.0;
-        let lut = cache.get_cached_lut(hardness);
-        let lut_scale = square((LUT_RADIUS - 1.0) / r2);
-
-        let mut mask = vec![0u8; (diameter * diameter) as usize];
-        let mut i = 0;
-
-        for y in 0..diameter {
-            let yy0 = square(y as f32 * 2.0 - r2 + offset);
-            let yy1 = square(y as f32 * 2.0 + 1.0 - r2 + offset);
-
-            for x in 0..diameter {
-                let xx0 = square(x as f32 * 2.0 - r2 + offset);
-                let xx1 = square(x as f32 * 2.0 + 1.0 - r2 + offset);
-
-                let dist0 = ((xx0 + yy0) * lut_scale) as usize;
-                let dist1 = ((xx0 + yy1) * lut_scale) as usize;
-                let dist2 = ((xx1 + yy0) * lut_scale) as usize;
-                let dist3 = ((xx1 + yy1) * lut_scale) as usize;
-
-                mask[i] = (if dist0 < lut.len() {
-                    (lut[dist0] * op) as u8
-                } else {
-                    0u8
-                }) + (if dist1 < lut.len() {
-                    (lut[dist1] * op) as u8
-                } else {
-                    0u8
-                }) + (if dist2 < lut.len() {
-                    (lut[dist2] * op) as u8
-                } else {
-                    0u8
-                }) + (if dist3 < lut.len() {
-                    (lut[dist3] * op) as u8
-                } else {
-                    0u8
-                });
-                i += 1;
-            }
-        }
-        (
-            diameter as f32 / 2.0,
-            BrushMask {
-                diameter: diameter as u32,
-                mask,
-            },
-        )
-    }
-
-    // Make a low-res Gimp style mask useful for large brushes. Return values includes x/y offset to get the top-left corner
-    fn new_gimp_style_lowres(
-        radius: f32,
-        hardness: f32,
-        opacity: f32,
-        cache: &mut ClassicBrushCache,
-    ) -> (f32, BrushMask) {
-        let op = opacity * 255.0;
+        let opacity_scale = 255.0 * opacity / 4.0; // 4 samples
 
         let lut = cache.get_cached_lut(hardness);
-        let lut_scale = square((LUT_RADIUS - 1.0) / radius);
-        let offset;
-        let mut fudge = 1.0;
-        let mut diameter = ((radius * 2.0).ceil() + 2.0) as i32;
-        if diameter % 2 == 0 {
-            diameter += 1;
-            offset = -1.0;
-            if radius < 8.0 {
-                fudge = 0.9;
-            }
-        } else {
-            offset = -0.5;
-        }
+        let lut_scale = LUT_RADIUS / radius;
 
-        // empirically determined fudge factors to make small brushes look nice
-        if radius < 4.0 {
-            fudge = 0.8;
-        }
+        for y in 0..idia {
+            let yy1 = square(y as f32 * 2.0 + yoffset);
+            let yy2 = square(y as f32 * 2.0 + yoffset + 1.0);
+            for x in 0..idia {
+                let xx1 = square(x as f32 * 2.0 + xoffset);
+                let xx2 = square(x as f32 * 2.0 + xoffset + 1.0);
 
-        let mut mask = vec![0u8; (diameter * diameter) as usize];
-        let mut i = 0;
+                let value = [xx1 + yy1, xx2 + yy1, xx1 + yy2, xx2 + yy2].iter().fold(
+                    0.0,
+                    |acc, dist_squared| {
+                        let dist = fast_sqrt(*dist_squared);
+                        let dist_scaled = (dist * lut_scale) as usize;
+                        acc + if dist_scaled < lut.len() {
+                            let cover = (radius - dist).max(0.0).min(1.0);
+                            lut[dist_scaled] * cover
+                        } else {
+                            0.0
+                        }
+                    },
+                ) * opacity_scale;
 
-        for y in 0..diameter {
-            let yy = square(y as f32 - radius + offset);
-            for x in 0..diameter {
-                let xx = square(x as f32 - radius + offset);
-                let dist = ((xx + yy) * fudge * lut_scale) as usize;
-                mask[i] = if dist < lut.len() {
-                    (lut[dist] * op) as u8
-                } else {
-                    0u8
-                };
-                i += 1;
+                mask[y * idia + x] = value as u8;
             }
         }
-        (
-            diameter as f32 / 2.0,
-            BrushMask {
-                diameter: diameter as u32,
-                mask,
-            },
-        )
-    }
 
-    fn offset(&self, x: f32, y: f32) -> BrushMask {
-        debug_assert!(x >= 0.0 && x <= 1.0);
-        debug_assert!(y >= 0.0 && y <= 1.0);
-        let kernel = [x * y, (1.0 - x) * y, x * (1.0 - y), (1.0 - x) * (1.0 - y)];
-        let dia = self.diameter as usize;
-        let mut newmask = vec![0; dia * dia];
-        let mut i = 1usize;
-        newmask[0] = (self.mask[0] as f32 * kernel[3]) as u8;
-        for x in 0..dia - 1 {
-            newmask[i] =
-                (self.mask[x] as f32 * kernel[2] + self.mask[x + 1] as f32 * kernel[3]) as u8;
-            i += 1;
-        }
-        for y in 0..dia - 1 as usize {
-            let yd = y * dia;
-            newmask[i] =
-                (self.mask[yd] as f32 * kernel[1] + self.mask[yd + dia] as f32 * kernel[3]) as u8;
-            i += 1;
-            for x in 0..dia - 1 as usize {
-                newmask[i] = (self.mask[yd + x] as f32 * kernel[0]
-                    + self.mask[yd + x + 1] as f32 * kernel[1]
-                    + self.mask[yd + dia + x] as f32 * kernel[2]
-                    + self.mask[yd + dia + x + 1] as f32 * kernel[3])
-                    as u8;
-                i += 1;
-            }
-        }
         BrushMask {
-            diameter: self.diameter,
-            mask: newmask,
+            diameter: idia as u32,
+            mask,
+        }
+    }
+
+    fn new_gimp_style_v2_simple(
+        x: f32,
+        y: f32,
+        diameter: f32,
+        hardness: f32,
+        opacity: f32,
+        cache: &mut ClassicBrushCache,
+    ) -> BrushMask {
+        let idia = diameter.ceil().max(1.0) as usize + 2;
+
+        let mut mask = vec![0u8; idia * idia];
+
+        let fx = x.floor();
+        let fy = y.floor();
+        let xfrac = x - fx;
+        let yfrac = y - fy;
+
+        let diameter_offset = (1.0 - diameter % 2.0) / 2.0;
+        let radius = diameter as f32 / 2.0 + 0.5;
+        let xoffset = 0.5 - xfrac - radius - diameter_offset;
+        let yoffset = 0.5 - yfrac - radius - diameter_offset;
+
+        let opacity_scale = 255.0 * opacity;
+
+        let lut = cache.get_cached_lut(hardness);
+        let lut_scale = LUT_RADIUS / radius;
+
+        for y in 0..idia {
+            let yy = square(y as f32 + yoffset);
+            for x in 0..idia {
+                let xx = square(x as f32 + xoffset);
+                let dist = fast_sqrt(xx + yy);
+
+                let dist_scaled = (dist * lut_scale) as usize;
+                let value = if dist_scaled < lut.len() {
+                    let cover = (radius - dist).max(0.0).min(1.0);
+                    lut[dist_scaled] * cover * opacity_scale
+                } else {
+                    0.0
+                };
+
+                mask[y * idia + x] = value as u8;
+            }
+        }
+
+        BrushMask {
+            diameter: idia as u32,
+            mask,
         }
     }
 
@@ -280,18 +218,17 @@ impl BrushMask {
 const LUT_RADIUS: f32 = 128.0;
 
 // Generate a lookup table for Gimp style exponential brush shape
-// The value at r² (where r is distance from brush center, scaled to LUT_RADIUS) is
+// The value at r (where r is distance from brush center, scaled to LUT_RADIUS) is
 // the opaqueness of the pixel.
-fn make_gimp_style_brush_lut(hardness: f32) -> Vec<f32> {
+fn make_gimp_style_v2_brush_lut(hardness: f32) -> Vec<f32> {
     let exponent = if (1.0 - hardness) < 0.000_000_4 {
         1_000_000.0f32
     } else {
         0.4 / (1.0 - hardness)
     };
 
-    let lut_size = (LUT_RADIUS * LUT_RADIUS) as usize;
     Vec::<f32>::from_iter(
-        (0..lut_size).map(|i| 1.0 - ((i as f32).sqrt() / LUT_RADIUS).powf(exponent)),
+        (0..LUT_RADIUS as usize).map(|i| 1.0 - (i as f32 / LUT_RADIUS).powf(exponent)),
     )
 }
 
