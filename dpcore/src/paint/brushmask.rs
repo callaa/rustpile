@@ -1,4 +1,6 @@
 use std::iter::FromIterator;
+use super::rectiter::RectIterator;
+use super::rect::Rectangle;
 
 pub struct BrushMask {
     /// Brush diameter (mask shape is a square)
@@ -6,6 +8,12 @@ pub struct BrushMask {
 
     /// Brush mask (length is diameter^2)
     pub mask: Vec<u8>,
+}
+
+impl BrushMask {
+    pub fn rect_iter(&self, r: &Rectangle) -> RectIterator<u8> {
+        RectIterator::from_rectangle(&self.mask, self.diameter as usize, r)
+    }
 }
 
 pub struct ClassicBrushCache {

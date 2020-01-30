@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use super::aoe::{AoE, TileMap};
 use super::blendmode::Blendmode;
+use super::brushmask::BrushMask;
 use super::color::{Color, Pixel};
 use super::rect::Rectangle;
 use super::rectiter::RectIterator;
@@ -157,6 +158,54 @@ impl Layer {
         let ty = y - tj * TILE_SIZE;
 
         self.tile(ti, tj).pixel_at(tx, ty)
+    }
+
+    /// Get a weighted average of the color under the dab mask
+    pub fn sample_dab_color(&self, x: i32, y: i32, dab: &BrushMask) -> Color {
+        let sample_rect = match Rectangle::new(x, y, dab.diameter as i32, dab.diameter as i32)
+            .cropped(self.width, self.height)
+        {
+            Some(r) => r,
+            None => return Color::TRANSPARENT,
+        };
+
+        let tx0 = sample_rect.x / TILE_SIZEI;
+        let ty0 = sample_rect.y / TILE_SIZEI;
+        let tx1 = sample_rect.right() / TILE_SIZEI;
+        let ty1 = sample_rect.bottom() / TILE_SIZEI;
+
+        let mut sum_weight = 0.0;
+        let mut sum_color = Color::TRANSPARENT;
+
+        for tx in tx0..=tx1 {
+            for ty in ty0..=ty1 {
+                let tile = self.tile(tx as u32, ty as u32);
+                let tile_rect = Rectangle::tile(tx, ty, TILE_SIZEI);
+                let subrect = sample_rect.intersected(&tile_rect).unwrap();
+                let rect_in_tile = subrect.offset(-tile_rect.x, -tile_rect.y);
+                let rect_in_dab = subrect.offset(-sample_rect.x, -sample_rect.y);
+                for (pix, mask) in tile
+                    .rect_iter(&rect_in_tile)
+                    .flatten()
+                    .zip(dab.rect_iter(&rect_in_dab).flatten())
+                {
+                    let m = *mask as f32 / 255.0;
+                    let c = Color::from_pixel(*pix);
+                    sum_weight += m;
+                    sum_color.r += c.r * m;
+                    sum_color.g += c.g * m;
+                    sum_color.b += c.b * m;
+                    sum_color.a += c.a * m;
+                }
+            }
+        }
+
+        sum_color.r /= sum_weight;
+        sum_color.g /= sum_weight;
+        sum_color.b /= sum_weight;
+        sum_color.a /= sum_weight;
+
+        sum_color
     }
 
     /// Check if every tile of this layer is the same
@@ -624,5 +673,26 @@ mod tests {
 
         assert_eq!(layer.pixel_at(5, 10), ZERO_PIXEL);
         assert_eq!(layer.pixel_at(0, 0), WHITE_PIXEL);
+    }
+
+    #[test]
+    fn test_sample_dab() {
+        let mut layer = Layer::new(0, TILE_SIZE * 2, TILE_SIZE * 2, &Color::TRANSPARENT);
+        layer.tile_mut(0, 0).fill(&Color::rgb8(255, 0, 0), 0);
+        layer.tile_mut(1, 0).fill(&Color::rgb8(0, 255, 0), 0);
+        layer.tile_mut(0, 1).fill(&Color::rgb8(0, 0, 255), 0);
+
+        let dab_mask = BrushMask::new_round_pixel(32, 1.0);
+        let sampled = layer.sample_dab_color(64 - 16, 64 - 16, &dab_mask);
+
+        assert_eq!(
+            sampled,
+            Color {
+                r: 0.25,
+                g: 0.25,
+                b: 0.25,
+                a: 0.75
+            }
+        );
     }
 }
