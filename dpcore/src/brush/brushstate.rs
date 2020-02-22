@@ -20,7 +20,32 @@
 // You should have received a copy of the GNU General Public License
 // along with Drawpile.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod brush;
-pub mod canvas;
-pub mod paint;
-pub mod protocol;
+use crate::paint::Layer;
+use crate::protocol::message::CommandMessage;
+
+pub trait BrushState {
+    /// Set the target layer
+    fn set_layer(&mut self, layer_id: u16);
+
+    /// Draw a brush stroke to this point
+    ///
+    /// If there is no active stroke, this becomes the starting point
+    ///
+    /// If a source layer is given, it is used as the source of color smudging pixels
+    fn stroke_to(&mut self, x: f32, y: f32, p: f32, source: Option<&Layer>);
+
+    /// End the current stroke (if any)
+    fn end_stroke(&mut self);
+
+    /// Take the dabs computed so far.
+    /// Doing this will not end the current stroke.
+    fn take_dabs(&mut self, user_id: u8) -> Vec<CommandMessage>;
+
+    /// Add an offset to the current position.
+    ///
+    /// This is used to correct the active position when the viewport
+    /// is moved while the user is still drawing.
+    ///
+    /// Does nothing if there is no stroke in progress.
+    fn add_offset(&mut self, x: f32, y: f32);
+}

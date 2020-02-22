@@ -20,7 +20,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Drawpile.  If not, see <https://www.gnu.org/licenses/>.
 
-pub mod brush;
-pub mod canvas;
-pub mod paint;
-pub mod protocol;
+mod brushengine;
+mod brushstate;
+mod classicbrush;
+mod pixelbrushstate;
+mod softbrushstate;
+
+pub use brushengine::BrushEngine;
+pub use brushstate::BrushState;
+pub use classicbrush::{ClassicBrush, ClassicBrushShape};
+pub use pixelbrushstate::PixelBrushState;

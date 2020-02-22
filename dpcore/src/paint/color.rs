@@ -47,6 +47,13 @@ impl Color {
         a: 0.0,
     };
 
+    pub const BLACK: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+
     pub fn rgb8(r: u8, g: u8, b: u8) -> Color {
         Color {
             r: r as f32 / 255.0,

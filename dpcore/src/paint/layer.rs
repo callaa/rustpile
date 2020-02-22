@@ -182,6 +182,12 @@ impl Layer {
         self.tile(ti, tj).pixel_at(tx, ty)
     }
 
+    /// Get a weighted average of the color using a default sampling mask
+    pub fn sample_color(&self, x: i32, y: i32, dia: u32) -> Color {
+        let mask = BrushMask::new_round_pixel(dia, 1.0);
+        self.sample_dab_color(x, y, &mask)
+    }
+
     /// Get a weighted average of the color under the dab mask
     pub fn sample_dab_color(&self, x: i32, y: i32, dab: &BrushMask) -> Color {
         let sample_rect = match Rectangle::new(x, y, dab.diameter as i32, dab.diameter as i32)
